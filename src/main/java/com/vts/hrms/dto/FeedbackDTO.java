@@ -35,6 +35,6 @@ public class FeedbackDTO {
     private LocalDate toDate;
     private Integer programDuration;
     private String participantName;
-
+    private String divisionName;
 
 }

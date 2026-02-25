@@ -370,6 +370,7 @@ public class TrainingService {
                                 + (designation.isEmpty() ? "" : ", " + designation);
 
                 d.setParticipantName(participantName.trim());
+                d.setDivisionName(employeeDTO.getEmpDivCode());
             }
 
             RequisitionDTO requisitionDto = null;
