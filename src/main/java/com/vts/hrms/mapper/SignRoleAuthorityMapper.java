@@ -5,5 +5,5 @@ import com.vts.hrms.entity.SignRoleAuthority;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
-public interface SignRoleAuthorityMapper extends com.vts.ems.mapper.EntityMapper<SignRoleAuthorityDTO, SignRoleAuthority> {
+public interface SignRoleAuthorityMapper extends EntityMapper<SignRoleAuthorityDTO, SignRoleAuthority> {
 }

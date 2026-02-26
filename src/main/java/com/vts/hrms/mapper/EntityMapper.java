@@ -1,4 +1,4 @@
-package com.vts.ems.mapper;
+package com.vts.hrms.mapper;
 
 import org.mapstruct.BeanMapping;
 import org.mapstruct.MappingTarget;

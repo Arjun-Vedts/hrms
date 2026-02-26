@@ -5,5 +5,5 @@ import com.vts.hrms.entity.Program;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
-public interface ProgramMapper extends com.vts.ems.mapper.EntityMapper<ProgramDTO, Program> {
+public interface ProgramMapper extends EntityMapper<ProgramDTO, Program> {
 }

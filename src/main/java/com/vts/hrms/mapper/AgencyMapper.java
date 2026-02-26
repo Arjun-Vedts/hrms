@@ -5,6 +5,6 @@ import com.vts.hrms.entity.Organizer;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
-public interface AgencyMapper extends com.vts.ems.mapper.EntityMapper<OrganizerIdDTO, Organizer> {
+public interface AgencyMapper extends EntityMapper<OrganizerIdDTO, Organizer> {
 
 }

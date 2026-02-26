@@ -5,5 +5,5 @@ import com.vts.hrms.entity.Requisition;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
-public interface RequisitionMapper extends com.vts.ems.mapper.EntityMapper<RequisitionDTO, Requisition> {
+public interface RequisitionMapper extends EntityMapper<RequisitionDTO, Requisition> {
 }

@@ -5,5 +5,5 @@ import com.vts.hrms.entity.Feedback;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
-public interface FeedbackMapper  extends com.vts.ems.mapper.EntityMapper<FeedbackDTO, Feedback> {
+public interface FeedbackMapper  extends EntityMapper<FeedbackDTO, Feedback> {
 }
