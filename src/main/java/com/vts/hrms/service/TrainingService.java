@@ -2362,4 +2362,90 @@ public class TrainingService {
         return masterCacheService.getLabMasterData()
                 .orElseThrow(() -> new NotFoundException("Lab Master data not found."));
     }
+
+    public List<FeedbackDTO> getFeedbackListByDateRange(Long empId, String roleName, LocalDate fromDate, LocalDate toDate) {
+        log.info("Feedback list fetched by empId {} fromDate {} toDate {}", empId, fromDate, toDate);
+
+        List<Feedback> feedbackList;
+        List<EmployeeDTO> employeeList = masterClient.getEmployeeMasterList(xApiKey);
+
+        if (Arrays.asList("ROLE_ADMIN", "ROLE_AD_HRT", "ROLE_SA_HRT", "ROLE_DIRECTOR",
+                "ROLE_CAG_DIV", "ROLE_TCG_DIV", "ROLE_SM_HRT").contains(roleName) && empId == 0) {
+
+            feedbackList = feedbackRepository.findByDateRange(fromDate,toDate);
+
+        } else if ("ROLE_DH".equalsIgnoreCase(roleName) || "ROLE_GH".equalsIgnoreCase(roleName)) {
+
+            List<DivisionDTO> divisionList = masterClient.getDivisionMaster(xApiKey);
+
+            Optional<DivisionDTO> divisionOpt = divisionList.stream()
+                    .filter(d -> Objects.equals(d.getDivisionHeadId(), empId))
+                    .findFirst();
+
+            if (divisionOpt.isPresent()) {
+
+                Long divisionId = divisionOpt.get().getDivisionId();
+                List<Long> empIds = employeeList.stream()
+                        .filter(e -> labCode != null && labCode.equalsIgnoreCase(e.getLabCode()))
+                        .filter(emp -> Objects.equals(emp.getDivisionId(), divisionId))
+                        .map(EmployeeDTO::getEmpId)
+                        .collect(Collectors.toList());
+
+                feedbackList = feedbackRepository.findAllActiveByParticipantsAndDateRange(empIds, fromDate, toDate);
+
+            } else {
+                feedbackList = new ArrayList<>();
+            }
+
+        } else {
+            feedbackList = feedbackRepository.findAllActiveByParticipantAndDateRange(empId, fromDate, toDate);
+        }
+
+        if (feedbackList == null || feedbackList.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<FeedbackDTO> feedbbackdto = feedbackMapper.toDto(feedbackList);
+
+        if (feedbbackdto == null || feedbbackdto.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, EmployeeDTO> employeeMap = employeeList != null
+                ? employeeList.stream()
+                .filter(e -> labCode != null && labCode.equalsIgnoreCase(e.getLabCode()))
+                .collect(Collectors.toMap(EmployeeDTO::getEmpId, emp -> emp))
+                : Collections.emptyMap();
+
+        feedbbackdto.forEach(d -> {
+
+            if (d == null) return;
+
+            EmployeeDTO employeeDTO = employeeMap.get(d.getParticipantId());
+
+            if (employeeDTO != null) {
+                d.setParticipantName(CommonUtil.buildEmployeeName(employeeDTO, true));
+                d.setDivisionName(employeeDTO.getEmpDivCode());
+                d.setIsGroup(employeeDTO.getIsGroup());
+            }
+
+            RequisitionDTO requisitionDto = null;
+
+            if (d.getRequisitionId() != null) {
+                requisitionDto = getRequisitionById(d.getRequisitionId(), null);
+            }
+
+            if (requisitionDto != null) {
+                d.setRequisitionNumber(requisitionDto.getRequisitionNumber());
+                d.setCourseName(requisitionDto.getCourseName());
+                d.setOrganizer(requisitionDto.getOrganizer());
+                d.setFromDate(requisitionDto.getFromDate());
+                d.setToDate(requisitionDto.getToDate());
+                d.setProgramDuration(requisitionDto.getDuration());
+            }
+
+        });
+
+        return feedbbackdto;
+    }
 }

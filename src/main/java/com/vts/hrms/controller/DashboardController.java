@@ -3,6 +3,7 @@ package com.vts.hrms.controller;
 import com.vts.hrms.dto.CourseDashboardDTO;
 import com.vts.hrms.dto.RequisitionDTO;
 import com.vts.hrms.dto.RequisitionDashboardDTO;
+import com.vts.hrms.dto.YearlyRequisitionSummary;
 import com.vts.hrms.service.DashboardService;
 import com.vts.hrms.service.TrainingService;
 import org.springframework.http.ResponseEntity;
@@ -34,25 +35,6 @@ public class DashboardController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/requisition-count")
-    public ResponseEntity<List<RequisitionDashboardDTO>> getOrganizerRequisitionDashboard() {
-
-        List<RequisitionDashboardDTO> response =
-                dashboardService.getOrganizerRequisitionDashboard();
-
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/requisition-filter")
-    public ResponseEntity<List<RequisitionDashboardDTO>> getRequisitionFilterDashboard(
-            @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
-
-        List<RequisitionDashboardDTO> response =
-                dashboardService.getRequisitionFilterDashboard(startDate, endDate);
-
-        return ResponseEntity.ok(response);
-    }
 
     @GetMapping(value = "/requisition-list")
     public ResponseEntity<List<RequisitionDTO>> getRequisitionList(@RequestParam Long empId, @RequestParam String roleName,
@@ -62,16 +44,31 @@ public class DashboardController {
         return ResponseEntity.ok(list);
     }
 
-    @GetMapping("/user-requisition-filter")
-    public ResponseEntity<List<RequisitionDashboardDTO>> getUserRequisitionFilter(
+
+    @GetMapping("/requisition")
+    public ResponseEntity<RequisitionDashboardDTO> getDashboardData(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+
+        RequisitionDashboardDTO response = dashboardService.getDashboardData(startDate, endDate);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user-requisition")
+    public ResponseEntity<RequisitionDashboardDTO> getUserDashboardData(
             @RequestParam Long empId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
 
-        List<RequisitionDashboardDTO> response =
-                dashboardService.getUserRequisitionFilter(empId, startDate, endDate);
-
+        RequisitionDashboardDTO response = dashboardService.getUserDashboardData(empId, startDate, endDate);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/yearly-trend")
+    public ResponseEntity<List<YearlyRequisitionSummary>> getUserYearlyTrend(
+            @RequestParam Long empId,
+            @RequestParam(defaultValue = "7") int years) {
+        return ResponseEntity.ok(dashboardService.getUserYearlyTrend(empId, years));
     }
 
 }
