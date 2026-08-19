@@ -17,16 +17,22 @@ public class LoginEmployeeDto {
     private String empDesigName;
     private String empStatus;
     private String roleName;
+    private String hindiRoleName;
     private Long divisionId;
     private Long loginId;
     private Long roleId;
     private String isGroup;
+    private String hindiTitle;
+    private String hindiSalutation;
+    private String hindiEmpName;
+    private String hindiEmpDesigName;
 
-    public LoginEmployeeDto(Long empId, String roleName, Long loginId, Long roleId) {
+    public LoginEmployeeDto(Long empId, String roleName, Long loginId, Long roleId,String hindiRoleName) {
         this.empId = empId;
         this.roleName = roleName;
         this.loginId = loginId;
         this.roleId = roleId;
+        this.hindiRoleName = hindiRoleName;
     }
 
 }

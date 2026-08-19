@@ -23,7 +23,7 @@ public interface FormModuleRepository extends JpaRepository<FormModule, Long> {
             """, nativeQuery = true)
     List<FormModule> findDistinctFormModulesByRoleId(@Param("roleName") String roleName);
 
-    @Query(value = "SELECT form_module_id , form_module_name FROM hrms_form_module  WHERE is_active=1",
+    @Query(value = "SELECT form_module_id , form_module_name,hindi_form_module_name FROM hrms_form_module  WHERE is_active=1",
             nativeQuery = true)
     public List<Object[]> getformModulelist();
 

@@ -21,4 +21,5 @@ public class UserResponseDTO {
 
     private List<Long> roleIds;
     private List<String> roleNames;
+    private List<String> hindiRoleNames;
 }

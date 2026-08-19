@@ -15,20 +15,25 @@ public class EmployeeDTO implements Serializable {
 
     private Long empId;
     private String title;
+    private String hindiTitle;
     private String salutation;
+    private String hindiSalutation;
     private String empNo;
     private String employeeType;
     private String empName;
+    private String hindiEmpName;
     private Long designationId;
     private Long divisionId;
     private String empStatus;
 
     private Long srNo;
     private String empDesigName;
+    private String hindiDesignation;
     private String empDesigCode;
     private String desigCadre;
     private String empDivCode;
     private String roleName;
+    private String hindiRoleName;
     private String maritalStatus;
     private String gender;
     private String email;

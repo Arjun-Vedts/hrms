@@ -33,7 +33,7 @@ public interface LoginRepository extends JpaRepository<Login, Long> {
 
     boolean existsByUsernameIgnoreCase(String username);
 
-    @Query(value = "SELECT DISTINCT d.emp_id, f.role_name, d.login_id ,f.role_id " +
+    @Query(value = "SELECT DISTINCT d.emp_id, f.role_name, d.login_id ,f.role_id,f.hindi_role_name " +
             "FROM login d " +
             "JOIN login_role_security e ON e.login_id=d.login_id " +
             "JOIN role_security f ON f.role_id=e.role_id " +
@@ -45,7 +45,7 @@ public interface LoginRepository extends JpaRepository<Login, Long> {
 
     boolean existsByUsernameAndIsActive(String username, int isActive);
 
-    @Query(value = "SELECT DISTINCT d.emp_id, f.role_name, d.login_id ,f.role_id " +
+    @Query(value = "SELECT DISTINCT d.emp_id, f.role_name, d.login_id ,f.role_id,f.hindi_role_name " +
             "FROM login d " +
             "JOIN login_role_security e ON e.login_id=d.login_id " +
             "JOIN role_security f ON f.role_name=:roleDirector AND f.role_id=e.role_id " +
