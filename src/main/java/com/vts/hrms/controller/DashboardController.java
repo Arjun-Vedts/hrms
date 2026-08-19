@@ -1,9 +1,6 @@
 package com.vts.hrms.controller;
 
-import com.vts.hrms.dto.CourseDashboardDTO;
-import com.vts.hrms.dto.RequisitionDTO;
-import com.vts.hrms.dto.RequisitionDashboardDTO;
-import com.vts.hrms.dto.YearlyRequisitionSummary;
+import com.vts.hrms.dto.*;
 import com.vts.hrms.service.DashboardService;
 import com.vts.hrms.service.TrainingService;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -61,6 +59,25 @@ public class DashboardController {
             @RequestParam LocalDate endDate) {
 
         RequisitionDashboardDTO response = dashboardService.getUserDashboardData(empId, startDate, endDate);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user-evaluation")
+    public ResponseEntity<Map<String,Long>> getUserEvaluationData(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+
+        Map<String,Long> response = dashboardService.getUserEvaluationData(startDate, endDate);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user-req-pending")
+    public ResponseEntity<List<FeedbackDTO>> getUserRequisitionPending(
+            @RequestParam Long empId,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+
+        List<FeedbackDTO> response = dashboardService.getUserRequisitionPending(empId, startDate, endDate);
         return ResponseEntity.ok(response);
     }
 

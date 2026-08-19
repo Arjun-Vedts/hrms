@@ -1,11 +1,9 @@
 package com.vts.hrms.service;
 
 import com.vts.hrms.dto.*;
-import com.vts.hrms.entity.Course;
-import com.vts.hrms.entity.CourseType;
-import com.vts.hrms.entity.Organizer;
-import com.vts.hrms.entity.Requisition;
+import com.vts.hrms.entity.*;
 import com.vts.hrms.repository.CourseRepository;
+import com.vts.hrms.repository.EvaluationRepository;
 import com.vts.hrms.repository.RequisitionRepository;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -30,12 +28,14 @@ public class DashboardService {
     private final RequisitionRepository requisitionRepository;
     private final MasterCacheService masterCacheService;
     private final MasterClientService masterClientService;
+    private final EvaluationRepository evaluationRepository;
 
-    public DashboardService(CourseRepository courseRepository, RequisitionRepository requisitionRepository, MasterCacheService masterCacheService, MasterClientService masterClientService) {
+    public DashboardService(CourseRepository courseRepository, RequisitionRepository requisitionRepository, MasterCacheService masterCacheService, MasterClientService masterClientService, EvaluationRepository evaluationRepository) {
         this.courseRepository = courseRepository;
         this.requisitionRepository = requisitionRepository;
         this.masterCacheService = masterCacheService;
         this.masterClientService = masterClientService;
+        this.evaluationRepository = evaluationRepository;
     }
 
     public List<CourseDashboardDTO> getOrganizerCourseDashboard(LocalDate startDate, LocalDate endDate) {
@@ -383,6 +383,27 @@ public class DashboardService {
         }
         return result;
     }
+
+    public Map<String, Long> getUserEvaluationData(LocalDate startDate, LocalDate endDate) {
+        log.info("Fetching evaluation data for period startDate {} endDate {} ", startDate, endDate);
+
+        List<EvaluationDTO> list = evaluationRepository.findEvaluationData(startDate,endDate);
+        return list.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(
+                        dto -> dto.getImpact() == null || dto.getImpact().isBlank()
+                                ? "Unknown"
+                                : dto.getImpact().trim(),
+                        Collectors.counting()
+                ));
+    }
+
+    public List<FeedbackDTO> getUserRequisitionPending(Long empId, LocalDate startDate, LocalDate endDate) {
+        log.info("Fetching pending requisition data for empId {} from startDate {} to endDate {}", empId, startDate, endDate);
+
+        return requisitionRepository.findPendingRequisitions(empId, startDate, endDate);
+    }
+
 
     @Getter
     private static class CourseDashboardAccumulator {

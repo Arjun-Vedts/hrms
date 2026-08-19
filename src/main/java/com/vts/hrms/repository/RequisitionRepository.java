@@ -1,5 +1,6 @@
 package com.vts.hrms.repository;
 
+import com.vts.hrms.dto.FeedbackDTO;
 import com.vts.hrms.dto.RequisitionDashboardDTO;
 import com.vts.hrms.entity.Requisition;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -136,4 +137,23 @@ public interface RequisitionRepository extends JpaRepository<Requisition, Long> 
 
     List<Requisition> findAllByRequisitionIdIn(Collection<Long> requisitionIds);
 
+    @Query("""
+                SELECT new com.vts.hrms.dto.FeedbackDTO(
+                    r.requisitionId,
+                    r.requisitionNumber
+                )
+                FROM Requisition r
+                WHERE r.isActive = 1
+                  AND r.initiatingOfficer = :empId
+                  AND r.fromDate >= :fromDate
+                  AND r.toDate <= :toDate
+                  AND r.status IN ('CO', 'FA')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM Feedback f
+                      WHERE f.requisitionId = r.id
+                  )
+                ORDER BY r.id DESC
+            """)
+    List<FeedbackDTO> findPendingRequisitions(Long empId, LocalDate fromDate, LocalDate toDate);
 }

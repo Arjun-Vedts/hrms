@@ -53,4 +53,8 @@ public class FeedbackDTO {
 
     private String isGroup;
 
+    public FeedbackDTO(Long requisitionId, String requisitionNumber) {
+        this.requisitionId = requisitionId;
+        this.requisitionNumber = requisitionNumber;
+    }
 }
