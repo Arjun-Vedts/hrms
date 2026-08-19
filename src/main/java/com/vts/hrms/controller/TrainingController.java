@@ -252,6 +252,16 @@ public class TrainingController {
         );
     }
 
+    @GetMapping(value = "/feedback-list-date-range")
+    public ResponseEntity<ApiResponse> getFeedbackListByDateRange(@RequestParam Long empId, @RequestParam String roleName,
+                                                                  @RequestParam LocalDate fromDate, @RequestParam LocalDate toDate,
+                                                                  @RequestHeader String username) {
+        List<FeedbackDTO> list = trainingService.getFeedbackListByDateRange(empId, roleName, fromDate, toDate);
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Feedback list fetched successfully", list)
+        );
+    }
+
     @GetMapping(value = "/feedback-data/{id}")
     public ResponseEntity<ApiResponse> getFeedbackById(@PathVariable Long id, @RequestHeader String username) {
         FeedbackDTO list = trainingService.getFeedbackById(id, username);

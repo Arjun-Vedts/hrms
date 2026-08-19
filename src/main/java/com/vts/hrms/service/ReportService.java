@@ -103,7 +103,8 @@ public class ReportService {
 
 
     public List<RequisitionDTO> getCourseTrainingList(LocalDate fromDate, LocalDate toDate, String courseType) {
-        log.info("Fetching course training data");
+
+        log.info("Fetching course training data for type: {}", courseType);
 
         Map<Long, EmployeeDTO> employeeMap = masterCacheService.getLongEmployeeDTOMap();
         Map<Long, Organizer> organizerMap = masterCacheService.getOrganizerMap();
@@ -111,30 +112,54 @@ public class ReportService {
         Map<String, Status> statusMap = masterCacheService.getStatusMap();
 
         List<CourseTypeDTO> typeDTOList = trainingService.getCourseTypeList("user");
+
         Map<Long, CourseTypeDTO> typeDTOMap = typeDTOList.stream()
-                .collect(Collectors.toMap(CourseTypeDTO::getCourseTypeId, Function.identity()));
+                .collect(Collectors.toMap(
+                        CourseTypeDTO::getCourseTypeId,
+                        Function.identity()
+                ));
 
-        List<Requisition> list = requisitionRepository.getRequisitionDataByDateRange(fromDate,toDate);
+        List<Requisition> list = requisitionRepository.getRequisitionDataByDateRange(fromDate, toDate);
 
-        boolean isTraining = "course".equalsIgnoreCase(courseType);
+        Set<String> seminarTypes = Set.of("Seminar", "Symposium", "Conference", "Workshop");
+
+        boolean isSeminar = "seminar".equalsIgnoreCase(courseType);
 
         return list.stream()
                 .map(requisitionMapper::toDto)
                 .filter(dto -> {
-                    // Pre-fetch the course to determine the type for filtering
                     Course course = courseMap.get(dto.getCourseId());
-                    if (course == null) return false;
+
+                    if (course == null) {
+                        return false;
+                    }
 
                     CourseTypeDTO typeDTO = typeDTOMap.get(course.getCourseTypeId());
-                    String typeName = (typeDTO != null) ? typeDTO.getCourseType() : "";
 
-                    // Keep the dto if it matches the criteria
-                    return isTraining ? "Training".equalsIgnoreCase(typeName)
-                            : !"Training".equalsIgnoreCase(typeName);
+                    if (typeDTO == null ||
+                            typeDTO.getCourseType() == null) {
+                        return false;
+                    }
+
+                    String typeName = typeDTO.getCourseType().trim();
+
+                    boolean isSeminarType = seminarTypes.stream()
+                            .anyMatch(type ->
+                                    type.equalsIgnoreCase(typeName)
+                            );
+
+                    if (isSeminar) {
+                        return isSeminarType;
+                    }
+                    return !isSeminarType;
                 })
                 .peek(dto -> {
 
                     Course course = courseMap.get(dto.getCourseId());
+                    if (course == null) {
+                        return;
+                    }
+
                     Organizer organizer = organizerMap.get(course.getOrganizerId());
                     CourseTypeDTO typeDTO = typeDTOMap.get(course.getCourseTypeId());
                     EmployeeDTO employeeDTO = employeeMap.get(dto.getInitiatingOfficer());
@@ -142,14 +167,21 @@ public class ReportService {
 
                     dto.setCourseName(course.getCourseName());
                     dto.setCourseLevel(course.getCourseLevel());
-                    dto.setCourseType(typeDTO.getCourseType());
+
+                    if (typeDTO != null) {
+                        dto.setCourseType(typeDTO.getCourseType());
+                    }
+
                     dto.setVenue(course.getVenue());
 
-                    dto.setStatusColor(status.getColorCode());
-                    dto.setStatusName(status.getStatusName());
+                    if (status != null) {
+                        dto.setStatusColor(status.getColorCode());
+                        dto.setStatusName(status.getStatusName());
+                    }
 
                     dto.setOfflineRegistrationFee(course.getOfflineRegistrationFee());
                     dto.setOnlineRegistrationFee(course.getOnlineRegistrationFee());
+
                     if (organizer != null) {
                         dto.setOrganizer(organizer.getOrganizer());
                         dto.setOrganizerContactName(organizer.getContactName());
@@ -157,6 +189,7 @@ public class ReportService {
                         dto.setOrganizerFaxNo(organizer.getFaxNo());
                         dto.setOrganizerEmail(organizer.getEmail());
                     }
+
                     if (employeeDTO != null) {
                         dto.setEmpNo(employeeDTO.getEmpNo());
                         dto.setInitiatingOfficerName(CommonUtil.buildEmployeeName(employeeDTO, false));
