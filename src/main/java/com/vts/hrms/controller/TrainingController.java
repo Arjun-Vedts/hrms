@@ -450,12 +450,21 @@ public class TrainingController {
         }
     }
 
-    @GetMapping(value = "/req-approved-list")
-    public ResponseEntity<ApiResponse> getRequisitionApprovedList(@RequestParam Long empId, @RequestHeader String username) {
+    @GetMapping(value = "/req-sa-approved-list")
+    public ResponseEntity<ApiResponse> getRequisitionSAHRTApprovedList(@RequestParam Long empId, @RequestHeader String username) {
         List<RequisitionDTO> list = trainingService.getRequisitionApprovedList(empId, username);
 
         return ResponseEntity.ok(
-                new ApiResponse(true, "Requisition approved list fetched", list)
+                new ApiResponse(true, "Requisition SA-HRT approved list fetched", list)
+        );
+    }
+
+    @GetMapping(value = "/req-dir-approved-list")
+    public ResponseEntity<ApiResponse> getRequisitionDirectorApprovedList(@RequestParam Long empId, @RequestHeader String username) {
+        List<RequisitionDTO> list = trainingService.getRequisitionDirectorApprovedList(empId, username);
+
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Requisition Director approved list fetched", list)
         );
     }
 

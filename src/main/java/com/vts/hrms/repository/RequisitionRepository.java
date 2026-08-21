@@ -145,8 +145,8 @@ public interface RequisitionRepository extends JpaRepository<Requisition, Long> 
                 FROM Requisition r
                 WHERE r.isActive = 1
                   AND r.initiatingOfficer = :empId
-                  AND r.fromDate >= :fromDate
-                  AND r.toDate <= :toDate
+                  AND r.fromDate <= :toDate
+                  AND r.toDate >= :fromDate
                   AND r.status IN ('CO', 'FA')
                   AND NOT EXISTS (
                       SELECT 1

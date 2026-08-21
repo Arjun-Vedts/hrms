@@ -443,7 +443,8 @@ public class TrainingService {
                     .findFirst();
 
             if (division.isEmpty()) {
-                return Collections.emptyList();
+                return requisitionRepository
+                        .findAllByInitiatingOfficerAndIsActiveOrderByRequisitionIdDesc(empId, 1);
             }
 
             Long divisionId = division.get().getDivisionId();
@@ -452,22 +453,28 @@ public class TrainingService {
                     .filter(e -> labCode != null && labCode.equalsIgnoreCase(e.getLabCode()))
                     .filter(e -> Objects.equals(e.getDivisionId(), divisionId))
                     .map(EmployeeDTO::getEmpId)
-                    .toList();
+                    .collect(Collectors.toCollection(ArrayList::new));
+
+            // Include DH's own requisitions
+            empIds.add(empId);
 
             return requisitionRepository
-                    .findAllByInitiatingOfficerInAndIsActiveOrderByRequisitionIdDesc(empIds, 1);
+                    .findAllByInitiatingOfficerInAndIsActiveOrderByRequisitionIdDesc(
+                            empIds, 1);
         }
 
         if ("ROLE_GH".equalsIgnoreCase(roleName)) {
 
             if ("CAIR".equalsIgnoreCase(labCode)) {
+
                 Optional<DivisionDTO> division = masterClient.getDivisionMaster(xApiKey)
                         .stream()
                         .filter(d -> Objects.equals(d.getDivisionHeadId(), empId))
                         .findFirst();
 
                 if (division.isEmpty()) {
-                    return Collections.emptyList();
+                    return requisitionRepository
+                            .findAllByInitiatingOfficerAndIsActiveOrderByRequisitionIdDesc(empId, 1);
                 }
 
                 Long divisionId = division.get().getDivisionId();
@@ -476,10 +483,14 @@ public class TrainingService {
                         .filter(e -> labCode != null && labCode.equalsIgnoreCase(e.getLabCode()))
                         .filter(e -> Objects.equals(e.getDivisionId(), divisionId))
                         .map(EmployeeDTO::getEmpId)
-                        .toList();
+                        .collect(Collectors.toCollection(ArrayList::new));
+
+                // Include GH's own requisitions
+                empIds.add(empId);
 
                 return requisitionRepository
-                        .findAllByInitiatingOfficerInAndIsActiveOrderByRequisitionIdDesc(empIds, 1);
+                        .findAllByInitiatingOfficerInAndIsActiveOrderByRequisitionIdDesc(
+                                empIds, 1);
             } else {
 
                 Optional<DivisionGroupDTO> group = masterClient
@@ -501,11 +512,10 @@ public class TrainingService {
                 List<Long> empIds = employeeList.stream()
                         .filter(e -> divisionIds.contains(e.getDivisionId()))
                         .map(EmployeeDTO::getEmpId)
-                        .toList();
+                        .collect(Collectors.toCollection(ArrayList::new));
 
-                if (empIds.isEmpty()) {
-                    return Collections.emptyList();
-                }
+                // Include GH's own requisitions
+                empIds.add(empId);
 
                 return requisitionRepository
                         .findAllByInitiatingOfficerInAndIsActiveOrderByRequisitionIdDesc(empIds, 1);
@@ -876,7 +886,7 @@ public class TrainingService {
             if ("Y".equalsIgnoreCase(initiator.getIsGroup())) {
                 requisition.setStatus("AG");
                 forwardToRole(requisition, dto.getActionBy(), username, "SA-HRT", "AG");
-            }else{
+            } else {
                 requisition.setStatus("AR");
                 forwardToRole(requisition, dto.getActionBy(), username, "SA-HRT", "AR");
             }
@@ -1548,13 +1558,6 @@ public class TrainingService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        // Director
-        LoginEmployeeDto directorEmp =
-                loginRepository.findEmployeeByRoleName("ROLE_DIRECTOR");
-
-        Long directorEmpId =
-                directorEmp != null ? directorEmp.getEmpId() : null;
-
         // Active handovers received by current employee
         Set<Long> handedOverFromEmpIds = handingOverRepository
                 .findByToEmpIdAndToDateGreaterThanEqualAndIsActive(
@@ -1571,22 +1574,16 @@ public class TrainingService {
                         || handedOverFromEmpIds.stream()
                         .anyMatch(saHrtEmpIds::contains);
 
-        boolean isDirector =
-                Objects.equals(empId, directorEmpId)
-                        || handedOverFromEmpIds.contains(directorEmpId);
 
         List<String> statusCodes;
 
         if (isSAHRT) {
             statusCodes = Arrays.asList("AV", "DA");
-        } else if (isDirector) {
-            statusCodes = Arrays.asList("AD", "FC");
         } else {
             throw new RuntimeException("Access Denied");
         }
 
         List<Requisition> list = requisitionRepository.findAllByStatusInAndIsActive(statusCodes, 1);
-
 
         List<RequisitionDTO> dtoList = requisitionMapper.toDto(list);
 
@@ -2372,7 +2369,7 @@ public class TrainingService {
         if (Arrays.asList("ROLE_ADMIN", "ROLE_AD_HRT", "ROLE_SA_HRT", "ROLE_DIRECTOR",
                 "ROLE_CAG_DIV", "ROLE_TCG_DIV", "ROLE_SM_HRT").contains(roleName) && empId == 0) {
 
-            feedbackList = feedbackRepository.findByDateRange(fromDate,toDate);
+            feedbackList = feedbackRepository.findByDateRange(fromDate, toDate);
 
         } else if ("ROLE_DH".equalsIgnoreCase(roleName) || "ROLE_GH".equalsIgnoreCase(roleName)) {
 
@@ -2447,5 +2444,103 @@ public class TrainingService {
         });
 
         return feedbbackdto;
+    }
+
+    public List<RequisitionDTO> getRequisitionDirectorApprovedList(Long empId, String username) {
+        log.info("Requisition director approved list fetched by {}", username);
+
+        LocalDate today = LocalDate.now();
+
+        // SA_HRT Authorities
+        Set<Long> saHrtEmpIds = signRoleAuthorityRepository
+                .findBySignAuthRole("SA-HRT")
+                .stream()
+                .map(SignRoleAuthorityDTO::getEmpId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Director
+        LoginEmployeeDto directorEmp =
+                loginRepository.findEmployeeByRoleName("ROLE_DIRECTOR");
+
+        Long directorEmpId =
+                directorEmp != null ? directorEmp.getEmpId() : null;
+
+        // Active handovers received by current employee
+        Set<Long> handedOverFromEmpIds = handingOverRepository
+                .findByToEmpIdAndToDateGreaterThanEqualAndIsActive(
+                        empId,
+                        today,
+                        1)
+                .stream()
+                .map(HandingOver::getFromEmpId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        boolean isSAHRT =
+                saHrtEmpIds.contains(empId)
+                        || handedOverFromEmpIds.stream()
+                        .anyMatch(saHrtEmpIds::contains);
+
+        boolean isDirector =
+                Objects.equals(empId, directorEmpId)
+                        || handedOverFromEmpIds.contains(directorEmpId);
+
+        List<String> statusCodes;
+
+        if (isSAHRT || isDirector) {
+            statusCodes = Arrays.asList("AD", "FC");
+        } else {
+            throw new RuntimeException("Access Denied");
+        }
+
+        List<Requisition> list = requisitionRepository.findAllByStatusInAndIsActive(statusCodes, 1);
+
+        List<RequisitionDTO> dtoList = requisitionMapper.toDto(list);
+
+        Map<String, Status> statusMap = masterCacheService.getStatusMap();
+        Map<Long, Organizer> organizerMap = masterCacheService.getOrganizerMap();
+        Map<Long, Course> courseMap = masterCacheService.getCourseMap();
+        Map<Long, EmployeeDTO> employeeMap = masterCacheService.getLongEmployeeDTOMap();
+
+        for (RequisitionDTO dto : dtoList) {
+
+            // Course + Organizer
+            Course course = courseMap.get(dto.getCourseId());
+            if (course != null) {
+
+                dto.setCourseName(course.getCourseName());
+                dto.setVenue(course.getVenue());
+                dto.setOfflineRegistrationFee(course.getOfflineRegistrationFee());
+                dto.setOnlineRegistrationFee(course.getOnlineRegistrationFee());
+
+                Organizer organizer = organizerMap.get(course.getOrganizerId());
+                if (organizer != null) {
+                    dto.setOrganizerId(organizer.getOrganizerId());
+                    dto.setOrganizer(organizer.getOrganizer());
+                    dto.setOrganizerContactName(organizer.getContactName());
+                    dto.setOrganizerPhoneNo(organizer.getPhoneNo());
+                    dto.setOrganizerFaxNo(organizer.getFaxNo());
+                    dto.setOrganizerEmail(organizer.getEmail());
+                }
+            }
+
+            Status status = statusMap.get(dto.getStatus());
+            if (status != null) {
+                dto.setStatusName(status.getStatusName());
+                dto.setStatusColor(status.getColorCode());
+            }
+
+            if (dto.getInitiatingOfficer() != null) {
+                EmployeeDTO employeeDTO = employeeMap.get(dto.getInitiatingOfficer());
+                if (employeeDTO != null) {
+                    dto.setInitiatingOfficerName(CommonUtil.buildEmployeeName(employeeDTO, false));
+                    dto.setEmpDesigName(employeeDTO.getEmpDesigName());
+                    dto.setIsGroup(employeeDTO.getIsGroup());
+                }
+            }
+        }
+
+        return dtoList;
     }
 }
