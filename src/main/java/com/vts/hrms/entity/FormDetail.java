@@ -39,6 +39,10 @@ public class FormDetail {
     @Column(name = "form_disp_name", length = 100)
     private String formDispName;
 
+    @Size(max = 100)
+    @Column(name = "hindi_form_disp_name", length = 100)
+    private String hindiFormDispName;
+
     @NotNull
     @Column(name = "form_admin", nullable = false)
     private Integer formAdmin;

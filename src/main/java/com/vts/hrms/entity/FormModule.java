@@ -27,6 +27,9 @@ public class FormModule  {
     @Column(name = "form_module_name", length = 255)
     private String formModuleName;
 
+    @Column(name = "hindi_form_module_name", length = 255)
+    private String hindiFormModuleName;
+
 
     @Column(name = "module_icon", length = 255)
     private String moduleIcon;
@@ -58,9 +61,10 @@ public class FormModule  {
     private LocalDateTime modifiedDate;
 
 
-    public FormModule(Long formModuleId, String formModuleName, String moduleIcon, String moduleUrl, Integer serialNo, Integer isActive, String createdBy, LocalDateTime createdDate, String modifiedBy, LocalDateTime modifiedDate) {
+    public FormModule(Long formModuleId, String formModuleName,String hindiFormModuleName, String moduleIcon, String moduleUrl, Integer serialNo, Integer isActive, String createdBy, LocalDateTime createdDate, String modifiedBy, LocalDateTime modifiedDate) {
         this.formModuleId = formModuleId;
         this.formModuleName = formModuleName;
+        this.hindiFormModuleName = hindiFormModuleName;
         this.moduleIcon = moduleIcon;
         this.moduleUrl = moduleUrl;
         this.serialNo = serialNo;

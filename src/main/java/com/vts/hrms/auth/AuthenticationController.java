@@ -1,6 +1,7 @@
 package com.vts.hrms.auth;
 
 import com.vts.hrms.cfg.JwtUtil;
+import com.vts.hrms.entity.Role;
 import com.vts.hrms.repository.LoginRepository;
 import com.vts.hrms.repository.RoleRepository;
 import com.vts.hrms.service.MasterClientService;
@@ -22,10 +23,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -73,10 +71,19 @@ public class AuthenticationController {
                     UserDetails userdetails = userDetailsService.loadUserByUsername(authenticationRequest.getUsername());
                     String token = jwtUtil.generateToken(userdetails);
 
+                   List<Role> roleList = roleRepository.findAll();
+
+
                     Set<String> roles = userdetails.getAuthorities().stream()
                             .map(GrantedAuthority::getAuthority)
                             .collect(Collectors.toSet());
-                    return ResponseEntity.ok(new ApiResponse(true, "Login successful", new AuthenticationResponse(token,roles)));
+
+                    Set<String> hindiRoles = roleList.stream()
+                            .filter(role -> roles.contains(role.getRoleName()))
+                            .map(Role::getHindiRoleName)
+                            .collect(Collectors.toSet());
+
+                    return ResponseEntity.ok(new ApiResponse(true, "Login successful", new AuthenticationResponse(token,roles,hindiRoles)));
                 }
 
             }
@@ -132,8 +139,17 @@ public class AuthenticationController {
                         .map(GrantedAuthority::getAuthority)
                         .collect(Collectors.toSet());
 
+                List<Role> roleList = roleRepository.findAll();
+
+
+                Set<String> hindiRoles = roleList.stream()
+                        .filter(role -> roles.contains(role.getRoleName()))
+                        .map(Role::getHindiRoleName)
+                        .collect(Collectors.toSet());
+
+
                 LOG.info("Authentication successful for user: {}", username);
-                return ResponseEntity.ok(new ApiResponse(true, "Login successful", new AuthenticationResponse(token,roles)));
+                return ResponseEntity.ok(new ApiResponse(true, "Login successful", new AuthenticationResponse(token,roles,hindiRoles)));
 
             } catch (DisabledException e) {
                 LOG.warn("Disabled account login attempt: {}", authenticationRequest.getUsername());

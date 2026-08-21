@@ -16,6 +16,7 @@ public class FormDetailDto {
     private String FormName;
     private String FormUrl;
     private String FormDispName;
+    private String hindiFormDispName;
     private int FormSerialNo ;
     private String FormColor;
     private int IsActive ;

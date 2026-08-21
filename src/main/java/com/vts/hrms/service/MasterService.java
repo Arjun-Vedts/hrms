@@ -84,11 +84,16 @@ public class MasterService {
         dto.setEmpNo(employee.getEmpNo());
         dto.setEmployeeType(employee.getEmployeeType());
         dto.setTitle(employee.getTitle());
+        dto.setHindiTitle(employee.getHindiTitle());
         dto.setSalutation(employee.getSalutation());
+        dto.setHindiSalutation(employee.getHindiSalutation());
         dto.setEmpName(employee.getEmpName());
+        dto.setHindiEmpName(employee.getHindiEmpName());
         dto.setEmpDesigName(employee.getEmpDesigName());
+        dto.setHindiEmpDesigName(employee.getHindiDesignation());
         dto.setEmpStatus(employee.getEmpStatus());
         dto.setRoleName(dto.getRoleName());
+        dto.setHindiRoleName(dto.getHindiRoleName());
         dto.setDivisionId(employee.getDivisionId());
         dto.setLoginId(dto.getLoginId());
         dto.setRoleId(dto.getRoleId());
