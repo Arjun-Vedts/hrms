@@ -56,84 +56,124 @@ public class MasterController {
         );
     }
 
-    @GetMapping(value = "/employee")
-    public ResponseEntity<ApiResponse> getAllEmployees(@RequestParam("empId") Long empId, @RequestParam("roleName") String roleName) {
+    @GetMapping("/employee")
+    public ResponseEntity<ApiResponse> getAllEmployees(@RequestParam Long empId, @RequestParam String roleName) {
 
+        Comparator<EmployeeDTO> employeeComparator =
+                Comparator.comparingLong(
+                        employee -> employee.getSrNo() == 0
+                                ? Long.MAX_VALUE
+                                : employee.getSrNo()
+                );
 
-        List<EmployeeDTO> employeeList = masterService.getEmployeeList();
+        // Common filter: Only Present/Active employees
+        List<EmployeeDTO> activeEmployees = masterService.getEmployeeList()
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(employee ->
+                        "P".equalsIgnoreCase(employee.getEmpStatus())
+                )
+                .toList();
+
         List<EmployeeDTO> list;
-
 
         if ("ROLE_ADMIN".equalsIgnoreCase(roleName)) {
 
-            // Admin → Get full list
-            list = employeeList.stream()
-                    .sorted(Comparator.comparingLong(e -> e.getSrNo() == 0 ? Long.MAX_VALUE : e.getSrNo()))
+            list = activeEmployees.stream()
+                    .sorted(employeeComparator)
                     .toList();
 
         } else if ("ROLE_USER".equalsIgnoreCase(roleName)) {
 
-            // User → Filter only their own empId
-            list = employeeList.stream()
-                    .filter(emp -> emp.getEmpId().equals(empId))
-                    .sorted(Comparator.comparingLong(e -> e.getSrNo() == 0 ? Long.MAX_VALUE : e.getSrNo()))
-                    .collect(Collectors.toList());
+            list = activeEmployees.stream()
+                    .filter(employee -> Objects.equals(employee.getEmpId(), empId))
+                    .sorted(employeeComparator)
+                    .toList();
 
         } else if ("ROLE_DH".equalsIgnoreCase(roleName)) {
 
-            List<DivisionDTO> divisionDTOS = masterService.getDivisionMaster();
+            Set<Long> divisionIds = masterService.getDivisionMaster()
+                    .stream()
+                    .filter(division ->
+                            Objects.equals(division.getDivisionHeadId(), empId)
+                    )
+                    .map(DivisionDTO::getDivisionId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
 
-            Set<Long> divisionIds = divisionDTOS.stream()
-                    .filter(e -> e.getDivisionHeadId().equals(empId))
-                    .map(DivisionDTO::getDivisionId).collect(Collectors.toSet());
-
-            // DH → Filter only their division employee
-            list = employeeList.stream()
-                    .filter(emp -> divisionIds.contains(emp.getDivisionId()))
-                    .sorted(Comparator.comparingLong(e -> e.getSrNo() == 0 ? Long.MAX_VALUE : e.getSrNo()))
+            list = activeEmployees.stream()
+                    .filter(employee ->
+                            divisionIds.contains(employee.getDivisionId())
+                    )
+                    .sorted(employeeComparator)
                     .toList();
+
         } else if ("ROLE_GH".equalsIgnoreCase(roleName)) {
+
+            List<DivisionDTO> divisions = masterService.getDivisionMaster();
+
+            Set<Long> divisionIds;
+
             if ("CAIR".equalsIgnoreCase(labCode)) {
-                List<DivisionDTO> divisionDTOS = masterService.getDivisionMaster();
 
-                Set<Long> divisionIds = divisionDTOS.stream()
-                        .filter(e -> e.getDivisionHeadId().equals(empId))
-                        .map(DivisionDTO::getDivisionId).collect(Collectors.toSet());
+                divisionIds = divisions.stream()
+                        .filter(division ->
+                                Objects.equals(
+                                        division.getDivisionHeadId(),
+                                        empId
+                                )
+                        )
+                        .map(DivisionDTO::getDivisionId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
 
-                // DH → Filter only their division employee
-                list = employeeList.stream()
-                        .filter(emp -> divisionIds.contains(emp.getDivisionId()))
-                        .sorted(Comparator.comparingLong(e -> e.getSrNo() == 0 ? Long.MAX_VALUE : e.getSrNo()))
-                        .toList();
             } else {
-                List<DivisionGroupDTO> groupDTOList = masterClient.getDivisionGroupMasterList(xApiKey);
 
-                Optional<DivisionGroupDTO> groupOpt = groupDTOList.stream()
-                        .filter(group -> Objects.equals(group.getGroupHeadId(), empId))
-                        .findFirst();
+                Optional<DivisionGroupDTO> groupOpt =
+                        masterClient
+                                .getDivisionGroupMasterList(xApiKey)
+                                .stream()
+                                .filter(group ->
+                                        Objects.equals(
+                                                group.getGroupHeadId(),
+                                                empId
+                                        )
+                                )
+                                .findFirst();
 
-                Long groupId = groupOpt.get().getGroupId();
+                Long groupId = groupOpt
+                        .map(DivisionGroupDTO::getGroupId)
+                        .orElse(null);
 
-                List<DivisionDTO> divisionDTOS = masterService.getDivisionMaster();
-
-                Set<Long> divisionIds = divisionDTOS.stream()
-                        .filter(e -> e.getGroupId().equals(groupId))
-                        .map(DivisionDTO::getDivisionId).collect(Collectors.toSet());
-
-                // DH → Filter only their division employee
-                list = employeeList.stream()
-                        .filter(emp -> divisionIds.contains(emp.getDivisionId()))
-                        .sorted(Comparator.comparingLong(e -> e.getSrNo() == 0 ? Long.MAX_VALUE : e.getSrNo()))
-                        .toList();
+                divisionIds = divisions.stream()
+                        .filter(division ->
+                                Objects.equals(
+                                        division.getGroupId(),
+                                        groupId
+                                )
+                        )
+                        .map(DivisionDTO::getDivisionId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
             }
-        } else {
 
-            // Optional: default case
+            list = activeEmployees.stream()
+                    .filter(employee ->
+                            divisionIds.contains(employee.getDivisionId())
+                    )
+                    .sorted(employeeComparator)
+                    .toList();
+
+        } else {
             list = Collections.emptyList();
         }
 
         return ResponseEntity.ok(
-                new ApiResponse(true, "Employee list fetched successfully", list)
+                new ApiResponse(
+                        true,
+                        "Employee list fetched successfully",
+                        list
+                )
         );
     }
 

@@ -116,9 +116,21 @@ public class TrainingService {
 
     @Transactional(readOnly = true)
     public List<OrganizerDTO> getAllAgencies() {
+
         List<Organizer> list = organizerRepository.findAllByIsActive(1);
-        list = list.stream().sorted(Comparator.comparing(Organizer::getCreatedDate, Comparator.nullsLast(Comparator.naturalOrder()))).toList();
-        return list.stream().map(organizerMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
+
+        list = list.stream()
+                .sorted(
+                        Comparator.comparing(
+                                Organizer::getOrganizer,
+                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
+                        )
+                )
+                .toList();
+
+        return list.stream()
+                .map(organizerMapper::toDto)
+                .collect(Collectors.toCollection(LinkedList::new));
     }
 
     @Transactional
@@ -862,6 +874,7 @@ public class TrainingService {
                 .orElse(BigDecimal.ZERO);
 
         String status = requisition.getStatus();
+        EmployeeDTO initiator = masterCacheService.getLongEmployeeDTOMap().get(requisition.getInitiatingOfficer());
 
         if ("AS".equalsIgnoreCase(status)) {
 
@@ -880,23 +893,67 @@ public class TrainingService {
 
         } else if ("AF".equalsIgnoreCase(status)) {
 
-            EmployeeDTO initiator = masterCacheService.getLongEmployeeDTOMap().get(requisition.getInitiatingOfficer());
-
             // Change AR to AG only for group users
-            if ("Y".equalsIgnoreCase(initiator.getIsGroup())) {
+            String isGroup = initiator.getIsGroup();
+
+            if ("Y".equalsIgnoreCase(isGroup)) {
+
                 requisition.setStatus("AG");
                 forwardToRole(requisition, dto.getActionBy(), username, "SA-HRT", "AG");
+
+            } else if ("B".equalsIgnoreCase(isGroup)) {
+
+                requisition.setStatus("AG");
+
+                // Get Division Master
+                List<DivisionDTO> divisionList = masterClient.getDivisionMaster(xApiKey);
+
+                DivisionDTO division = divisionList.stream()
+                        .filter(Objects::nonNull)
+                        .filter(e -> Objects.equals(e.getDivisionId(), initiator.getDivisionId()))
+                        .findFirst()
+                        .orElseThrow(() -> new NotFoundException("Division not found for divisionId: " + initiator.getDivisionId()));
+
+                if (division.getGroupId() == null) {
+                    throw new BadRequestException("Group is not mapped to division: " + initiator.getDivisionId());
+                }
+
+                // Get Division Group Master
+                List<DivisionGroupDTO> groupList = masterClient.getDivisionGroupMasterList(xApiKey);
+
+                DivisionGroupDTO group = groupList.stream()
+                        .filter(Objects::nonNull)
+                        .filter(e -> Objects.equals(e.getGroupId(), division.getGroupId()))
+                        .findFirst()
+                        .orElseThrow(() -> new NotFoundException("Division group not found for groupId: " + division.getGroupId()));
+
+                Long groupHeadId = group.getGroupHeadId();
+
+                if (groupHeadId == null) {
+                    throw new BadRequestException("Group head is not configured for groupId: " + division.getGroupId());
+                }
+
+                EmployeeDTO employee = masterCacheService.getLongEmployeeDTOMap().get(dto.getActionBy());
+                String message = getNotificationMsg(requisition.getRequisitionNumber(), employee, "Forward by");
+
+                insertTransaction(dto.getRequisitionId(), dto.getActionBy(), groupHeadId, username, "AG", null);
+                insertNotification(dto.getActionBy(), groupHeadId, "req-approval", message, username);
+
             } else {
+
                 requisition.setStatus("AR");
                 forwardToRole(requisition, dto.getActionBy(), username, "SA-HRT", "AR");
             }
 
+        } else if ("B".equalsIgnoreCase(initiator.getIsGroup()) && "AG".equalsIgnoreCase(status)) {
+
+            requisition.setStatus("AR");
+            forwardToRole(requisition, dto.getActionBy(), username, "SA-HRT", "AR");
+
         } else if ("AR".equalsIgnoreCase(status) || "AG".equalsIgnoreCase(status) || "SF".equalsIgnoreCase(status)) {
 
             requisition.setStatus("AS");
-
             String role = registrationFee.compareTo(limit) >= 0 ? "CAG-Div" : "AD-HRT";
-
             forwardToRole(requisition, dto.getActionBy(), username, role, "AS");
         }
 
@@ -2344,6 +2401,10 @@ public class TrainingService {
 
         Requisition requisition = requisitionRepository.findById(dto.getRequisitionId())
                 .orElseThrow(() -> new NotFoundException("Requisition data not found"));
+
+        if ("N".equalsIgnoreCase(dto.getIsConfirmed())) {
+            requisition.setIsConfirmed("Y");
+        }
 
         requisition.setIsAttend(dto.getIsAttend());
         requisition.setAttendRemarks(dto.getAttendRemarks());

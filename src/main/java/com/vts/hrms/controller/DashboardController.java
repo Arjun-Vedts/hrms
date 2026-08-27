@@ -27,8 +27,7 @@ public class DashboardController {
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
 
-        List<CourseDashboardDTO> response =
-                dashboardService.getOrganizerCourseDashboard(startDate, endDate);
+        List<CourseDashboardDTO> response = dashboardService.getOrganizerCourseDashboard(startDate, endDate);
 
         return ResponseEntity.ok(response);
     }
@@ -64,10 +63,11 @@ public class DashboardController {
 
     @GetMapping("/user-evaluation")
     public ResponseEntity<Map<String,Long>> getUserEvaluationData(
+            @RequestParam Long empId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
 
-        Map<String,Long> response = dashboardService.getUserEvaluationData(startDate, endDate);
+        Map<String,Long> response = dashboardService.getUserEvaluationData(empId, startDate, endDate);
         return ResponseEntity.ok(response);
     }
 

@@ -50,4 +50,27 @@ public interface EvaluationRepository extends JpaRepository<Evaluation, Long> {
                 WHERE e.isActive = 1 AND e.traineeId = :id
             """)
     List<EvaluationDTO> findByEmployee(@Param("id") Long id);
+
+    @Query("""
+                SELECT new com.vts.hrms.dto.EvaluationDTO(
+                    e.evaluationId,
+                    e.requisitionId,
+                    e.traineeId,
+                    p.courseId,
+                    e.impact,
+                    p.courseName,
+                    r.fromDate,
+                    r.toDate
+                )
+                FROM Evaluation e
+                LEFT JOIN Requisition r ON r.requisitionId = e.requisitionId
+                AND r.status IN ("CO", "FA") AND r.isAttend = "Y"
+                LEFT JOIN Course p ON p.courseId = r.courseId
+                WHERE e.isActive = 1 AND e.traineeId = :empId
+                AND r.fromDate >= :fromDate AND r.toDate <= :toDate
+                ORDER BY r.fromDate DESC
+            """)
+    List<EvaluationDTO> findEvaluationByDateRangeAndEmpId(@Param("empId") Long empId,
+                                                          @Param("fromDate") LocalDate fromDate,
+                                                          @Param("toDate") LocalDate toDate);
 }

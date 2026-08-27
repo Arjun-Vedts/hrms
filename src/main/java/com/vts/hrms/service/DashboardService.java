@@ -50,20 +50,17 @@ public class DashboardService {
 
         RequisitionDashboardDTO dto = new RequisitionDashboardDTO();
 
-
         List<Requisition> requisitions =
                 Optional.ofNullable(requisitionRepository.getRequisitionDataByDateRange(startDate, endDate))
                         .orElse(Collections.emptyList());
-
 
         if (requisitions.isEmpty()) {
             dto.setOrganisers(0L);
             dto.setCourses(0L);
             dto.setRequisitions(0L);
             dto.setAttended(0L);
-            dto.setCourseCounts(Collections.emptyList());
             dto.setAttendedByCadre(null);
-            dto.setNotAttendedByCadre(null);
+            dto.setCourseTypeCounts(Collections.emptyList());
             dto.setCourseParticipants(Collections.emptyList());
             log.info("No requisition data found between {} and {}", startDate, endDate);
             return dto;
@@ -88,7 +85,6 @@ public class DashboardService {
                                 )
                         );
 
-
         long requisitionCount = requisitions.size();
         long attendedCount = requisitions.stream().filter(this::isAttended).count();
 
@@ -108,12 +104,13 @@ public class DashboardService {
                 .distinct()
                 .count();
 
-
         Map<String, Long> attendedCadreCounts = createCountMap(CADRES);
-        Map<String, Long> notAttendedCadreCounts = createCountMap(CADRES);
-        Map<String, Long> courseTypeCounts = createCountMap(COURSE_TYPES);
 
+        // per-course accumulator -> feeds courseParticipants (ALL requisitions, unchanged)
         Map<Long, CourseDashboardAccumulator> courseAccumulator = new LinkedHashMap<>();
+
+        // per-courseType accumulator -> feeds courseTypeCounts (ATTENDED ONLY)
+        Map<Long, CourseTypeDashboardAccumulator> courseTypeAccumulator = new LinkedHashMap<>();
 
         for (Requisition requisition : requisitions) {
 
@@ -125,10 +122,10 @@ public class DashboardService {
             EmployeeDTO employee = participantId == null ? null : employeeMap.get(participantId);
             String cadre = resolveCadre(employee);
 
-            if (isAttended(requisition)) {
+            boolean attended = isAttended(requisition);
+
+            if (attended) {
                 attendedCadreCounts.merge(cadre, 1L, Long::sum);
-            } else {
-                notAttendedCadreCounts.merge(cadre, 1L, Long::sum);
             }
 
             Long courseId = requisition.getCourseId();
@@ -142,47 +139,65 @@ public class DashboardService {
                 continue;
             }
 
-            // NEW — course type bucket, reusing the course we already fetched
-            CourseType courseType = courseTypeMap.get(course.getCourseTypeId());
-            String resolvedType = resolveCourseType(courseType);
-            courseTypeCounts.merge(resolvedType, 1L, Long::sum);
-
-            CourseDashboardAccumulator accumulator =
+            // build per-course accumulator (courseParticipants) - all requisitions, unchanged
+            CourseDashboardAccumulator courseAcc =
                     courseAccumulator.computeIfAbsent(
                             courseId,
                             id -> new CourseDashboardAccumulator(id, resolveCourseName(course))
                     );
-            accumulator.incrementTotal();
-            accumulator.incrementCadre(cadre);
+            courseAcc.incrementTotal();
+            courseAcc.incrementCadre(cadre);
+
+            // build per-courseType accumulator (courseTypeCounts) - ONLY attended requisitions
+            if (!attended) {
+                continue;
+            }
+
+            Long courseTypeId = course.getCourseTypeId();
+            if (courseTypeId == null) {
+                log.debug("CourseTypeId not found on course for courseId={}", courseId);
+                continue;
+            }
+
+            CourseTypeDashboardAccumulator courseTypeAcc =
+                    courseTypeAccumulator.computeIfAbsent(
+                            courseTypeId,
+                            id -> new CourseTypeDashboardAccumulator(id, resolveCourseTypeName(courseTypeMap.get(id)))
+                    );
+            courseTypeAcc.incrementTotal();
+            courseTypeAcc.incrementCadre(cadre);
         }
 
         dto.setOrganisers(organiserCount);
         dto.setCourses(uniqueCourseCount);
         dto.setRequisitions(requisitionCount);
         dto.setAttended(attendedCount);
-        dto.setCourseCounts(toCountTypeResponseList(COURSE_TYPES, courseTypeCounts));
         dto.setAttendedByCadre(toCountTypeResponseList(CADRES, attendedCadreCounts));
-        dto.setNotAttendedByCadre(toCountTypeResponseList(CADRES, notAttendedCadreCounts));
+
+        List<CountTypeResponse> courseTypeResponses =
+                courseTypeAccumulator.values()
+                        .stream()
+                        .map(this::toCourseTypeResponse)
+                        .toList();
+        dto.setCourseTypeCounts(courseTypeResponses);
 
         List<CountTypeResponse> courseResponses =
                 courseAccumulator.values()
                         .stream()
                         .map(this::toCourseResponse)
                         .toList();
-
         dto.setCourseParticipants(courseResponses);
-
 
         log.info(
                 "Requisition dashboard generated successfully. " +
                         "Requisitions={}, Courses={}, Organisers={}, Attended={}, " +
-                        "AttendedCadres={}, NotAttendedCadres={}, CoursesData={}",
+                        "AttendedCadres={}, CourseTypesData={}, CourseParticipants={}",
                 requisitionCount,
                 uniqueCourseCount,
                 organiserCount,
                 attendedCount,
                 attendedCadreCounts.size(),
-                notAttendedCadreCounts.size(),
+                courseTypeResponses.size(),
                 courseResponses.size()
         );
 
@@ -191,10 +206,6 @@ public class DashboardService {
 
     private static final List<String> CADRES = List.of(
             "DRDS", "DRTC", "Admin & Allied", "Service Personnel", "Others"
-    );
-
-    private static final List<String> COURSE_TYPES = List.of(
-            "Training", "Seminar", "Symposium", "Conference", "Workshop"
     );
 
     private Map<String, Long> createCountMap(List<String> keys) {
@@ -212,56 +223,129 @@ public class DashboardService {
         return response;
     }
 
-    private String resolveCourseType(CourseType courseType) {
-        if (courseType == null || courseType.getCourseTypeId() == null) {
-            return "Training";
-        }
-
-        String name = courseType.getCourseType();
-        if (name == null) return "Training";
-        name = name.trim();
-        if ("Seminar".equalsIgnoreCase(name)) return "Seminar";
-        if ("Symposium".equalsIgnoreCase(name)) return "Symposium";
-        if ("Conference".equalsIgnoreCase(name)) return "Conference";
-        if ("Workshop".equalsIgnoreCase(name)) return "Workshop";
-        return "Training";
-    }
-
     private boolean isAttended(Requisition requisition) {
         return requisition != null
-                && "Y".equalsIgnoreCase(
-                requisition.getIsAttend()
-        );
+                && "Y".equalsIgnoreCase(requisition.getIsAttend());
     }
 
     private String resolveCadre(EmployeeDTO employee) {
         if (employee == null) {
             return "Others";
         }
-
         String cadre = employee.getDesigCadre();
         if (cadre == null || cadre.isBlank()) {
             return "Others";
         }
-
         cadre = cadre.trim();
         if ("DRDS".equalsIgnoreCase(cadre)) {
             return "DRDS";
         }
-
         if ("DRTC".equalsIgnoreCase(cadre)) {
             return "DRTC";
         }
-
         if ("Service Personnel".equalsIgnoreCase(cadre)) {
             return "Service Personnel";
         }
-
         if ("Admin & Allied".equalsIgnoreCase(cadre)) {
             return "Admin & Allied";
         }
-
         return "Others";
+    }
+
+    private String resolveCourseName(Course course) {
+        if (course == null) {
+            return "Unknown Course";
+        }
+        String courseName = course.getCourseName();
+        if (courseName == null || courseName.isBlank()) {
+            return "Unknown Course";
+        }
+        return courseName.trim();
+    }
+
+    private String resolveCourseTypeName(CourseType courseType) {
+        if (courseType == null) {
+            return "Unknown Course Type";
+        }
+        String name = courseType.getCourseType();
+        if (name == null || name.isBlank()) {
+            return "Unknown Course Type";
+        }
+        return name.trim();
+    }
+
+    @Getter
+    private static class CourseDashboardAccumulator {
+
+        private final Long courseId;
+        private final String courseName;
+        private long total;
+        private final Map<String, Long> cadreCounts;
+
+        CourseDashboardAccumulator(Long courseId, String courseName) {
+            this.courseId = courseId;
+            this.courseName = courseName;
+            this.cadreCounts = new LinkedHashMap<>();
+            this.cadreCounts.put("DRDS", 0L);
+            this.cadreCounts.put("DRTC", 0L);
+            this.cadreCounts.put("Admin & Allied", 0L);
+            this.cadreCounts.put("Service Personnel", 0L);
+            this.cadreCounts.put("Others", 0L);
+        }
+
+        void incrementTotal() {
+            this.total++;
+        }
+
+        void incrementCadre(String cadre) {
+            this.cadreCounts.merge(cadre, 1L, Long::sum);
+        }
+    }
+
+    @Getter
+    private static class CourseTypeDashboardAccumulator {
+
+        private final Long courseTypeId;
+        private final String courseTypeName;
+        private long total;
+        private final Map<String, Long> cadreCounts;
+
+        CourseTypeDashboardAccumulator(Long courseTypeId, String courseTypeName) {
+            this.courseTypeId = courseTypeId;
+            this.courseTypeName = courseTypeName;
+            this.cadreCounts = new LinkedHashMap<>();
+            this.cadreCounts.put("DRDS", 0L);
+            this.cadreCounts.put("DRTC", 0L);
+            this.cadreCounts.put("Admin & Allied", 0L);
+            this.cadreCounts.put("Service Personnel", 0L);
+            this.cadreCounts.put("Others", 0L);
+        }
+
+        void incrementTotal() {
+            this.total++;
+        }
+
+        void incrementCadre(String cadre) {
+            this.cadreCounts.merge(cadre, 1L, Long::sum);
+        }
+    }
+
+    private CountTypeResponse toCourseResponse(CourseDashboardAccumulator accumulator) {
+        CountTypeResponse response = new CountTypeResponse();
+        response.setType(String.valueOf(accumulator.getCourseId()));
+        response.setCount(accumulator.getTotal());
+        response.setCourseName(accumulator.getCourseName());
+        response.setCadreCounts(new LinkedHashMap<>(accumulator.getCadreCounts()));
+        return response;
+    }
+
+    private CountTypeResponse toCourseTypeResponse(CourseTypeDashboardAccumulator accumulator) {
+        CountTypeResponse response = new CountTypeResponse();
+        response.setType(accumulator.getCourseTypeName());
+        response.setCount(accumulator.getTotal());
+        response.setCourseName(null);
+        response.setCadreCounts(new LinkedHashMap<>(accumulator.getCadreCounts()));
+        return response;
     }
 
     public RequisitionDashboardDTO getUserDashboardData(Long empId, LocalDate startDate, LocalDate endDate) {
@@ -384,10 +468,10 @@ public class DashboardService {
         return result;
     }
 
-    public Map<String, Long> getUserEvaluationData(LocalDate startDate, LocalDate endDate) {
+    public Map<String, Long> getUserEvaluationData(Long empId, LocalDate startDate, LocalDate endDate) {
         log.info("Fetching evaluation data for period startDate {} endDate {} ", startDate, endDate);
 
-        List<EvaluationDTO> list = evaluationRepository.findEvaluationData(startDate,endDate);
+        List<EvaluationDTO> list = evaluationRepository.findEvaluationByDateRangeAndEmpId(empId, startDate, endDate);
         return list.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(
@@ -404,60 +488,5 @@ public class DashboardService {
         return requisitionRepository.findPendingRequisitions(empId, startDate, endDate);
     }
 
-
-    @Getter
-    private static class CourseDashboardAccumulator {
-
-        private final Long courseId;
-        private final String courseName;
-        private long total;
-        private final Map<String, Long> cadreCounts;
-
-
-        CourseDashboardAccumulator(Long courseId, String courseName) {
-
-            this.courseId = courseId;
-            this.courseName = courseName;
-            this.cadreCounts = new LinkedHashMap<>();
-
-            this.cadreCounts.put("DRDS", 0L);
-            this.cadreCounts.put("DRTC", 0L);
-            this.cadreCounts.put("Admin & Allied", 0L);
-            this.cadreCounts.put("Service Personnel", 0L);
-            this.cadreCounts.put("Others", 0L);
-        }
-
-
-        void incrementTotal() {
-            this.total++;
-        }
-
-        void incrementCadre(String cadre) {
-            this.cadreCounts.merge(cadre, 1L, Long::sum);
-        }
-    }
-
-    private CountTypeResponse toCourseResponse(CourseDashboardAccumulator accumulator) {
-
-        CountTypeResponse response = new CountTypeResponse();
-
-        response.setType(String.valueOf(accumulator.getCourseId()));
-        response.setCount(accumulator.getTotal());
-        response.setCourseName(accumulator.getCourseName());
-        response.setCadreCounts(new LinkedHashMap<>(accumulator.getCadreCounts()));
-        return response;
-    }
-
-    private String resolveCourseName(Course course) {
-        if (course == null) {
-            return "Unknown Course";
-        }
-
-        String courseName = course.getCourseName();
-        if (courseName == null || courseName.isBlank()) {
-            return "Unknown Course";
-        }
-        return courseName.trim();
-    }
 
 }

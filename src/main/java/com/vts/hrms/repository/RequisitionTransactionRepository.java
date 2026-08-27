@@ -18,7 +18,7 @@ public interface RequisitionTransactionRepository extends JpaRepository<Requisit
                 FROM hrms_req_transaction rt
                 WHERE rt.is_active = 1
                 AND rt.requisition_id = :reqId
-                AND rt.status_code NOT IN ('SF', 'CA', 'AR', 'AS')
+                AND rt.status_code NOT IN ('SF', 'CA', 'AR', 'AS', 'AG')
                 UNION ALL
                 SELECT rt.*,
                        ROW_NUMBER() OVER (
@@ -28,7 +28,7 @@ public interface RequisitionTransactionRepository extends JpaRepository<Requisit
                 FROM hrms_req_transaction rt
                 WHERE rt.is_active = 1
                 AND rt.requisition_id = :reqId
-                AND rt.status_code IN ('SF', 'CA', 'AR', 'AS')
+                AND rt.status_code IN ('SF', 'CA', 'AR', 'AS', 'AG')
             ) t
             WHERE t.rn = 1 ORDER BY t.action_date;
             """, nativeQuery = true)
