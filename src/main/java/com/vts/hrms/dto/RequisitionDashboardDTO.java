@@ -16,9 +16,8 @@ public class RequisitionDashboardDTO {
     private Long courses;
     private Long requisitions;
     private Long attended;
-    private List<CountTypeResponse> courseCounts;
     private List<CountTypeResponse> attendedByCadre;
-    private List<CountTypeResponse> notAttendedByCadre;
+    private List<CountTypeResponse> courseTypeCounts;
     private List<CountTypeResponse> courseParticipants;
 
 }

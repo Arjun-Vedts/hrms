@@ -25,5 +25,6 @@ public class DivisionDTO implements Serializable {
 
     private String divHeadName;
     private String isGroup;
+    private int isActive;
 
 }
