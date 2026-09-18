@@ -21,14 +21,14 @@ public interface FormRoleAccessRepository extends JpaRepository<FormRoleAccess,L
             WHERE fd.is_active = 1
             AND CASE WHEN :formModuleId <> '0' THEN fd.form_module_id = :formModuleId ELSE 1 = 1 END) AS a
             LEFT JOIN (SELECT b.form_role_access_id, b.form_detail_id AS 'detailid', b.role_id, b.is_active , b.for_view, b.for_add, b.for_edit, b.for_delete
-            FROM hrms_form_detail a, hrms_form_role_access b
+            FROM hrms_form_detail a, hrms_form_role_access b, role_security c
             WHERE a.form_detail_id = b.form_detail_id
-            AND b.role_id = :RoleId
+            AND b.role_id = c.role_id AND c.role_name = :roleName
             AND CASE WHEN :formModuleId <> '0' THEN a.form_module_id = :formModuleId ELSE 1 = 1 END) AS b
             ON a.form_detail_id = b.detailid
             """,
             nativeQuery = true)
-    List<Object[]> getformroleAccessList(@Param("RoleId") String roleId,
+    List<Object[]> getformroleAccessList(@Param("roleName") String roleName,
                                          @Param("formModuleId") String formModuleId);
 
     @Query(value = "SELECT COUNT(form_role_access_id) " +

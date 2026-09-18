@@ -2604,4 +2604,50 @@ public class TrainingService {
 
         return dtoList;
     }
+
+    @Transactional(readOnly = true)
+    public List<CourseDTO> getCourseListByDateRange(Long orgId, LocalDate fromDate, LocalDate toDate, String username) {
+        log.info("Course list fetched for organizer id {} period from {} to {} by {}", orgId, fromDate, toDate, username);
+
+        if (orgId == null || fromDate == null || toDate == null) {
+            return List.of();
+        }
+
+        List<Course> courseList = courseRepository.findCoursesByOrganizerAndDateRange(orgId, fromDate, toDate);
+
+        if (courseList.isEmpty()) {
+            return List.of();
+        }
+
+        List<Eligibility> eligibilityList = eligibilityRepository.findAllByIsActive(1);
+
+        Map<Long, Organizer> organizerMap = masterCacheService.getOrganizerMap();
+        Map<Long, Eligibility> eligibilityMap = eligibilityList.stream()
+                .collect(Collectors.toMap(Eligibility::getEligibilityId, Function.identity(),
+                        (existing, replacement) -> existing));
+
+        Map<Long, CourseType> courseTypeMap = masterCacheService.getCourseTypeMap();
+
+        // Map entities to DTOs
+        List<CourseDTO> dtoList = courseMapper.toDto(courseList);
+
+        // Enrich DTOs
+        dtoList.forEach(dto -> {
+            Organizer organizer = organizerMap.get(dto.getOrganizerId());
+            Eligibility eligibility = eligibilityMap.get(dto.getEligibilityId());
+            CourseType courseType = courseTypeMap.get(dto.getCourseTypeId());
+
+            if (organizer != null) {
+                dto.setOrganizer(organizer.getOrganizer());
+            }
+            if (eligibility != null) {
+                dto.setEligibilityName(eligibility.getEligibilityName());
+            }
+            if (courseType != null) {
+                dto.setCourseType(courseType.getCourseType());
+            }
+        });
+
+        return dtoList;
+    }
 }

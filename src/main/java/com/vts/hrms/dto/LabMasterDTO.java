@@ -1,11 +1,15 @@
 package com.vts.hrms.dto;
 
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class LabMasterDTO {
 
     private Long labMasterId;

@@ -11,16 +11,16 @@ import java.time.LocalDateTime;
 @ToString
 public class FormDetailDto {
 
-    private Long FormDetailId ;
-    private Long FormModuleId ;
-    private String FormName;
-    private String FormUrl;
-    private String FormDispName;
+    private Long formDetailId ;
+    private Long formModuleId ;
+    private String formName;
+    private String formUrl;
+    private String formDispName;
     private String hindiFormDispName;
-    private int FormSerialNo ;
-    private String FormColor;
-    private int IsActive ;
-    private String ModifiedBy;
-    private LocalDateTime ModifiedDate;
+    private int formSerialNo ;
+    private String formColor;
+    private int isActive ;
+    private String modifiedBy;
+    private LocalDateTime modifiedDate;
 
 }

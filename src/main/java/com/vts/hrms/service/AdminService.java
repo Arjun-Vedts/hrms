@@ -93,12 +93,21 @@ public class AdminService {
         log.info("Fetching all users");
         List<UserListRowDTO> rows = loginRepository.getUserList();
 
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+
         Map<Long, EmployeeDTO> employeeMap = masterCacheService.getLongEmployeeDTOMap();
+        Map<Long, EmployeeDTO> safeEmployeeMap = employeeMap != null ? employeeMap : Collections.emptyMap();
 
         // group flat rows (one per role) by loginId
         Map<Long, UserResponseDTO> grouped = new LinkedHashMap<>();
 
         for (UserListRowDTO row : rows) {
+            if (row == null) {
+                continue;
+            }
+
             UserResponseDTO user = grouped.get(row.getLoginId());
 
             if (user == null) {
@@ -110,7 +119,7 @@ public class AdminService {
                 user.setRoleIds(new ArrayList<>());
                 user.setRoleNames(new ArrayList<>());
 
-                EmployeeDTO employee = employeeMap.get(row.getEmpId());
+                EmployeeDTO employee = safeEmployeeMap.get(row.getEmpId());
                 if (employee != null) {
                     user.setEmployeeName(CommonUtil.buildEmployeeName(employee, false));
                     user.setDesignationName(employee.getEmpDesigName());
@@ -127,8 +136,16 @@ public class AdminService {
                 user.getRoleNames().add(row.getRoleName());
             }
         }
-
-        return new ArrayList<>(grouped.values());
+        // Sort grouped results by employee srNo ascending, placing nulls at the end
+        return grouped.values().stream()
+                .sorted(Comparator.comparing(
+                        user -> {
+                            EmployeeDTO emp = safeEmployeeMap.get(user.getEmpId());
+                            return emp != null ? emp.getSrNo() : null;
+                        },
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
+                .toList();
     }
 
     public boolean checkUsernameExists(String username) {
@@ -302,13 +319,13 @@ public class AdminService {
 
             formModuleList.forEach(detail -> {
                 FormModuleDto formModuleDto = FormModuleDto.builder()
-                        .FormModuleId(detail.getFormModuleId())
-                        .FormModuleName(detail.getFormModuleName())
+                        .formModuleId(detail.getFormModuleId())
+                        .formModuleName(detail.getFormModuleName())
                         .hindiFormModuleName(detail.getHindiFormModuleName())
-                        .ModuleUrl(detail.getModuleUrl())
-                        .ModuleIcon(detail.getModuleIcon())
-                        .SerialNo(detail.getSerialNo())
-                        .IsActive(detail.getIsActive())
+                        .moduleUrl(detail.getModuleUrl())
+                        .moduleIcon(detail.getModuleIcon())
+                        .serialNo(detail.getSerialNo())
+                        .isActive(detail.getIsActive())
                         .build();
 
                 formModuleDtoList.add(formModuleDto);
@@ -359,17 +376,17 @@ public class AdminService {
 
             formDetailList.forEach(detail -> {
                 FormDetailDto formModuleDto = FormDetailDto.builder()
-                        .FormDetailId(detail.getFormDetailId())
-                        .FormModuleId(detail.getFormModuleId())
-                        .FormName(detail.getFormName())
-                        .FormUrl(detail.getFormUrl())
-                        .FormDispName(detail.getFormDispName())
+                        .formDetailId(detail.getFormDetailId())
+                        .formModuleId(detail.getFormModuleId())
+                        .formName(detail.getFormName())
+                        .formUrl(detail.getFormUrl())
+                        .formDispName(detail.getFormDispName())
                         .hindiFormDispName(detail.getHindiFormDispName())
-                        .FormSerialNo(detail.getFormSerialNo())
-                        .FormColor(detail.getFormColor())
-                        .ModifiedBy(detail.getModifiedBy())
-                        .ModifiedDate(detail.getModifiedDate())
-                        .IsActive(detail.getIsActive())
+                        .formSerialNo(detail.getFormSerialNo())
+                        .formColor(detail.getFormColor())
+                        .modifiedBy(detail.getModifiedBy())
+                        .modifiedDate(detail.getModifiedDate())
+                        .isActive(detail.getIsActive())
                         .build();
 
                 formDetailDtoList.add(formModuleDto);
@@ -384,12 +401,12 @@ public class AdminService {
     }
 
 
-    @Cacheable(value = "formRoleAccessListByRole", key = "#roleId + '_' + #formModuleId")
-    public List<FormRoleAccessDto> getformRoleAccessList(String roleId, String formModuleId) {
+    @Cacheable(value = "formRoleAccessListByRole", key = "#roleName + '_' + #formModuleId")
+    public List<FormRoleAccessDto> getformRoleAccessList(String roleName, String formModuleId) {
         log.info(" AdminServiceImpl Inside method getformRoleAccessList");
         try {
 
-            List<Object[]> list = formRoleAccessRepository.getformroleAccessList(roleId, formModuleId);
+            List<Object[]> list = formRoleAccessRepository.getformroleAccessList(roleName, formModuleId);
             return list.stream().map(row -> {
                 return FormRoleAccessDto.builder()
                         .formRoleAccessId(row[0] != null ? Long.parseLong(row[0].toString()) : 0L)

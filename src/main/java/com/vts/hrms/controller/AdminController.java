@@ -96,7 +96,7 @@ public class AdminController {
         );
     }
 
-    @PostMapping(value = "/role-update", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/role-update")
     public ResponseEntity<String> roleUpdate(@RequestHeader String username, @RequestBody UserResponseDTO dto) throws Exception{
         LOG.info( "Inside roleUpdate : username :{} , dto : {} ", username, dto);
         try {
@@ -115,19 +115,19 @@ public class AdminController {
     }
 
 
-    @GetMapping(value = "/header-module", produces = "application/json")
+    @GetMapping(value = "/header-module")
     public List<FormModuleDto> headerModule(@RequestParam String roleName) throws Exception {
 
         return adminService.formModuleList(roleName);
     }
 
-    @GetMapping(value = "/header-detail", produces = "application/json")
+    @GetMapping(value = "/header-detail")
     public List<FormDetailDto> headerDetail(@RequestParam String roleName) throws Exception {
 
         return adminService.formModuleDetailList(roleName);
     }
 
-    @PostMapping(value = "/form-modules-list", produces = "application/json")
+    @PostMapping(value = "/form-modules-list")
     public ResponseEntity<List<FormModuleDto>> formModule() throws Exception {
 
         List<FormModuleDto> list = null;
@@ -142,15 +142,15 @@ public class AdminController {
         return new ResponseEntity<>(list, HttpStatus.OK);
     }
 
-    @PostMapping(value = "form-role-access-list", produces = "application/json")
+    @PostMapping(value = "form-role-access-list")
     public ResponseEntity<List<FormRoleAccessDto>> formRoleAccessList(@RequestBody Map<String, String> request) throws Exception {
 
         List<FormRoleAccessDto> list = null;
 
         try {
-            String roleId = request.get("roleId");
+            String roleName = request.get("roleName");
             String formModuleId = request.get("formModuleId");
-            list = adminService.getformRoleAccessList(roleId, formModuleId);
+            list = adminService.getformRoleAccessList(roleName, formModuleId);
             return new ResponseEntity<>(list, HttpStatus.OK);
         } catch (Exception e) {
             e.printStackTrace();
@@ -158,7 +158,7 @@ public class AdminController {
         }
     }
 
-    @PostMapping(value = "update-form-role-access", produces = "application/json")
+    @PostMapping(value = "update-form-role-access")
     public String updateFormRoleAccess(@RequestBody FormRoleAccessDto accessDto, @RequestHeader String username) throws Exception {
 
         String result = null;
@@ -183,43 +183,48 @@ public class AdminController {
         }
     }
 
-    @GetMapping(value = "/notification-count", produces = "application/json")
+    @GetMapping(value = "/notification-count")
     public ResponseEntity<Integer> getNotificationCount(@RequestHeader String username) throws Exception {
         LOG.info(" Inside get get-notification-count{}", username);
         Integer result = adminService.getNotificationCount(username);
         if (result != null) {
             return new ResponseEntity<>(result, HttpStatus.OK);
         } else {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.badRequest().build();
         }
     }
 
 
-    @GetMapping(value = "/notification-list", produces = "application/json")
+    @GetMapping(value = "/notification-list")
     public ResponseEntity<List<NotificationDTO>> getNotification(@RequestHeader String username) throws Exception {
         LOG.info(" Inside get get-notification List {}", username);
         List<NotificationDTO> result = adminService.getNotificationList(username);
         if (result != null) {
             return new ResponseEntity<>(result, HttpStatus.OK);
         } else {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.badRequest().build();
         }
     }
 
 
-    @PutMapping(value = "/update-notification", produces = "application/json")
-    public ResponseEntity<Long> updateNotification(@RequestHeader String username, @RequestParam String notificationId) throws Exception {
-        LOG.info(" Inside  update-notification  {}", username);
+    @PutMapping("/update-notification")
+    public ResponseEntity<Void> updateNotification(
+            @RequestHeader("username") String username,
+            @RequestParam("notificationId") String notificationId) {
+
+        LOG.info("Inside update-notification {}", username);
+
         long result = adminService.updateNotification(username, notificationId);
+
         if (result != 0) {
-            return new ResponseEntity<>(200L, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.ok().build();
         }
+
+        return ResponseEntity.badRequest().build();
     }
 
 
-    @PostMapping(value = "/get-role-username", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/get-role-username")
     public List<Long> getRoleByUsername(@RequestHeader String username) {
         try {
             Login login = loginRepository.findByUsernameAndIsActive(username,1);
@@ -254,11 +259,11 @@ public class AdminController {
             return new ResponseEntity<>(dto, HttpStatus.OK);
         } catch (Exception e) {
             LOG.error("Error in auditStampingList: {}", e.getMessage(), e);
-            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.badRequest().build();
         }
     }
 
-    @PostMapping(value="custom-audit-stamping-login" ,produces="application/json")
+    @PostMapping(value="custom-audit-stamping-login")
     public String logIn(@RequestBody String username, Authentication authentication, HttpServletRequest request)throws Exception {
         LOG.info(" Inside custom-audit-stamping-login: user:{}, ",username);
         long result=0;
@@ -293,26 +298,27 @@ public class AdminController {
     }
 
 
-    @PostMapping(value = "custom-audit-stamping-logout", produces = "application/json")
-    public String logout(@RequestBody JsonNode requestBody, Authentication authentication) throws Exception {
-        LOG.info( " Inside custom-auditStamping-logout {}", authentication.getName());
+    @PostMapping(value = "custom-audit-stamping-logout")
+    public String logout(@RequestBody(required = false) Map<String, Object> requestBody, Authentication authentication) throws Exception {
+        LOG.info("Inside custom-auditStamping-logout {}", authentication != null ? authentication.getName() : "Anonymous");
         long result = 0;
 
-        String username = requestBody.get("username").asText();
-        String logoutType = requestBody.get("logoutType").asText();
-        Login login = loginRepository.findByUsernameAndIsActive(username,1);
-        Long loginId = login.getLoginId();
+        if (requestBody == null) {
+            return String.valueOf(result);
+        }
 
-        try {
-            if (loginId!=null) {
+        String username = (String) requestBody.get("username");
+        String logoutType = (String) requestBody.get("logoutType");
+
+        if (username != null) {
+            Login login = loginRepository.findByUsernameAndIsActive(username, 1);
+            if (login != null && login.getLoginId() != null) {
                 AuditStamping stamping = new AuditStamping();
-                stamping.setAuditStampingId(adminService.lastLoginStampingId(loginId));
+                stamping.setAuditStampingId(adminService.lastLoginStampingId(login.getLoginId()));
                 stamping.setLogoutType(logoutType);
                 stamping.setLogoutDateTime(LocalDateTime.now());
                 result = adminService.loginStampingUpdate(stamping);
             }
-        } catch (Exception e) {
-            LOG.error(" error in custom-audit-stamping-logout {}", e.getMessage(),e);
         }
         return String.valueOf(result);
     }
@@ -325,7 +331,7 @@ public class AdminController {
         return adminService.getLoginStats(startDate, endDate);
     }
 
-    @PutMapping(value = "/change-password", produces="application/json")
+    @PutMapping(value = "/change-password")
     public ResponseEntity<String> updatePassword(@RequestHeader String username,@RequestBody ChangePasswordDTO dto){
         LOG.info("REST request to change password for user :{}",username);
         try {
@@ -341,7 +347,7 @@ public class AdminController {
         }
     }
 
-    @GetMapping(value = "/get-license", produces = "application/json")
+    @GetMapping(value = "/get-license")
     public ResponseEntity<Boolean> getLicense() {
         LOG.info("Inside getLicense()");
         try {
@@ -354,7 +360,7 @@ public class AdminController {
         }
     }
 
-    @PutMapping(value = "/update-password", produces="application/json")
+    @PutMapping(value = "/update-password")
     public String updatePassword(@RequestHeader String username, @RequestBody ChangePasswordDTO changePasswordDTO, @RequestHeader(value = "Authorization", required = false) String token){
         LOG.info(" Inside Update-password user :{}",username);
         changePasswordDTO.setUsername(username);
@@ -403,7 +409,7 @@ public class AdminController {
         );
     }
 
-    @PostMapping(value = "/add-cash-limit", produces = "application/json")
+    @PostMapping(value = "/add-cash-limit")
     public ResponseEntity<ApiResponse> addCashLimit(@Valid @RequestBody CashLimit cashLimit,
                                                     @RequestHeader String username) {
         try {
@@ -419,7 +425,7 @@ public class AdminController {
         }
     }
 
-    @PutMapping(value = "/update-cash-limit/{id}", produces = "application/json")
+    @PutMapping(value = "/update-cash-limit/{id}")
     public ResponseEntity<ApiResponse> updateCashLimit(@PathVariable Long id,
                                                        @Valid @RequestBody CashLimit cashLimit,
                                                        @RequestHeader String username) {
@@ -437,7 +443,7 @@ public class AdminController {
         }
     }
 
-    @GetMapping(value = "/cash-limit-list", produces = "application/json")
+    @GetMapping(value = "/cash-limit-list")
     public ResponseEntity<ApiResponse> getCashLimitList() {
 
         try {

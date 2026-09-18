@@ -1,7 +1,6 @@
 package com.vts.hrms.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.vts.hrms.dto.*;
 import com.vts.hrms.entity.*;
 import com.vts.hrms.mapper.*;
@@ -16,6 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -215,28 +216,35 @@ public class ReportService {
         Map<Long, CourseTypeDTO> typeDTOMap = typeDTOList.stream()
                 .collect(Collectors.toMap(CourseTypeDTO::getCourseTypeId, Function.identity()));
 
-        List<Requisition> list = requisitionRepository.findAllByIsAttendAndIsActive("Y",1);
+        List<Requisition> list = requisitionRepository.findAllByIsAttendAndIsActive("Y", 1);
 
         return list.stream()
                 .map(requisitionMapper::toDto)
                 .peek(dto -> {
-
                     Course course = courseMap.get(dto.getCourseId());
-                    Organizer organizer = organizerMap.get(course.getOrganizerId());
-                    CourseTypeDTO typeDTO = typeDTOMap.get(course.getCourseTypeId());
+                    Organizer organizer = (course != null) ? organizerMap.get(course.getOrganizerId()) : null;
+                    CourseTypeDTO typeDTO = (course != null && course.getCourseTypeId() != null)
+                            ? typeDTOMap.get(course.getCourseTypeId()) : null;
                     EmployeeDTO employeeDTO = employeeMap.get(dto.getInitiatingOfficer());
                     Status status = statusMap.get(dto.getStatus());
 
-                    dto.setCourseName(course.getCourseName());
-                    dto.setCourseLevel(course.getCourseLevel());
-                    dto.setCourseType(typeDTO.getCourseType());
-                    dto.setVenue(course.getVenue());
+                    if (course != null) {
+                        dto.setCourseName(course.getCourseName());
+                        dto.setCourseLevel(course.getCourseLevel());
+                        dto.setVenue(course.getVenue());
+                        dto.setOfflineRegistrationFee(course.getOfflineRegistrationFee());
+                        dto.setOnlineRegistrationFee(course.getOnlineRegistrationFee());
+                    }
 
-                    dto.setStatusColor(status.getColorCode());
-                    dto.setStatusName(status.getStatusName());
+                    if (typeDTO != null) {
+                        dto.setCourseType(typeDTO.getCourseType());
+                    }
 
-                    dto.setOfflineRegistrationFee(course.getOfflineRegistrationFee());
-                    dto.setOnlineRegistrationFee(course.getOnlineRegistrationFee());
+                    if (status != null) {
+                        dto.setStatusColor(status.getColorCode());
+                        dto.setStatusName(status.getStatusName());
+                    }
+
                     if (organizer != null) {
                         dto.setOrganizer(organizer.getOrganizer());
                         dto.setOrganizerContactName(organizer.getContactName());
@@ -244,6 +252,7 @@ public class ReportService {
                         dto.setOrganizerFaxNo(organizer.getFaxNo());
                         dto.setOrganizerEmail(organizer.getEmail());
                     }
+
                     if (employeeDTO != null) {
                         dto.setEmpNo(employeeDTO.getEmpNo());
                         dto.setInitiatingOfficerName(CommonUtil.buildEmployeeName(employeeDTO, false));
@@ -253,6 +262,22 @@ public class ReportService {
                         dto.setEmail(employeeDTO.getEmail());
                         dto.setMobileNo(employeeDTO.getMobileNo());
                     }
+                })
+                .sorted((dto1, dto2) -> {
+                    EmployeeDTO emp1 = employeeMap.get(dto1.getInitiatingOfficer());
+                    EmployeeDTO emp2 = employeeMap.get(dto2.getInitiatingOfficer());
+
+                    Integer sr1 = (emp1 != null) ? emp1.getSrNo().intValue() : null;
+                    Integer sr2 = (emp2 != null) ? emp2.getSrNo().intValue() : null;
+
+                    boolean isEnd1 = (sr1 == null || sr1 <= 0);
+                    boolean isEnd2 = (sr2 == null || sr2 <= 0);
+
+                    if (isEnd1 && isEnd2) return 0;
+                    if (isEnd1) return 1;   // Move dto1 (0 or null) to the end
+                    if (isEnd2) return -1;  // Keep dto2 (0 or null) at the end
+
+                    return Integer.compare(sr1, sr2); // Ascending order for valid srNo (1, 2, 3...)
                 })
                 .toList();
     }

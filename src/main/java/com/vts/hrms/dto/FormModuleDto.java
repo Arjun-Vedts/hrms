@@ -11,13 +11,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FormModuleDto {
 
-    private Long FormModuleId ;
-    private String FormModuleName ;
+    private Long formModuleId ;
+    private String formModuleName ;
     private String hindiFormModuleName;
-    private String ModuleUrl ;
-    private String ModuleIcon ;
-    private int SerialNo ;
-    private int IsActive ;
+    private String moduleUrl ;
+    private String moduleIcon ;
+    private int serialNo ;
+    private int isActive ;
 
 }
 
