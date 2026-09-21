@@ -13,9 +13,11 @@ import java.util.List;
 public class EvaluationRequestDTO implements Serializable {
 
     private Long initiator;
+    private Long preparedBy;
     private String empName;
     private String designation;
     private String title;
+    private String preparedByEmpName;
     private List<EvaluationDTO> evaluation;
     private EvaluationDTO evaluationData;
 }

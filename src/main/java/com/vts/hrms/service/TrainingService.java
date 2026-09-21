@@ -1260,8 +1260,12 @@ public class TrainingService {
             throw new NotFoundException("Initiator can not be null");
         }
         Long initiatorId = dto.getInitiator();
+
         EvaluationDTO evaluationDTO = dto.getEvaluationData();
+
         Evaluation evaluation = new Evaluation();
+
+        evaluation.setPreparedBy(dto.getPreparedBy());
         evaluation.setRequisitionId(evaluationDTO.getRequisitionId());
         evaluation.setTraineeId(initiatorId);
         evaluation.setImpact(evaluationDTO.getImpact());
@@ -1295,10 +1299,12 @@ public class TrainingService {
 
                     return new EvaluationRequestDTO(
                             traineeId,
+                            0L,
                             emp.getEmpName(),
                             emp.getEmpDesigName(),
                             emp.getSalutation() != null ? emp.getSalutation() :
                                     (emp.getTitle() != null ? emp.getTitle() : ""),
+                            "",
                             entry.getValue(),
                             null
                     );
@@ -1316,12 +1322,16 @@ public class TrainingService {
 
         List<EvaluationDTO> evaluation = evaluationRepository.findByEmployee(id);
 
-        List<EmployeeDTO> employeeDTOList = masterClient.getEmployee(xApiKey, id);
-        EmployeeDTO employeeDTO = employeeDTOList.get(0);
+        Map<Long, EmployeeDTO> employeeDTOMap = masterCacheService.getLongEmployeeDTOMap();
+        EmployeeDTO employeeDTO = employeeDTOMap.get(id);
+
+        long preparedBy = evaluation.get(0).getPreparedBy();
+        EmployeeDTO preparedEmpDTO = employeeDTOMap.get(preparedBy);
 
         EvaluationRequestDTO requestDTO = new EvaluationRequestDTO();
         requestDTO.setInitiator(id);
         requestDTO.setEmpName(employeeDTO != null ? CommonUtil.buildEmployeeName(employeeDTO, true) : "");
+        requestDTO.setPreparedByEmpName(preparedEmpDTO != null ? CommonUtil.buildEmployeeName(preparedEmpDTO, true) : "");
         requestDTO.setEvaluation(evaluation);
 
         return requestDTO;

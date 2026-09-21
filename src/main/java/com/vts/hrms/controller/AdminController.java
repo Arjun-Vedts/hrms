@@ -16,13 +16,20 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.net.InetAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,8 +45,10 @@ public class AdminController {
 
     private static final Logger LOG = LoggerFactory.getLogger(AdminController.class);
 
-    private final AdminService adminService;
+    @Value("${appStorage}")
+    private String folderPath;
 
+    private final AdminService adminService;
     private final LoginRepository loginRepository;
     private DateTimeFormatter formatter;
 
@@ -456,6 +465,54 @@ public class AdminController {
             return ResponseEntity.badRequest().body(
                     new ApiResponse(false, "Failed to fetch Cash Limit List", null)
             );
+        }
+    }
+
+    @GetMapping("/user-manual")
+    public ResponseEntity<Resource> getUserManualPdf() {
+        try {
+            Path filePath = Paths.get(folderPath).resolve("UserManual").resolve("HRMS.pdf").normalize();
+            File file = filePath.toFile();
+
+            if (!file.exists() || !file.canRead()) {
+                LOG.error("File not found or not readable at: " + filePath.toString());
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new FileSystemResource(file);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"HRMS.pdf\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            LOG.error("Error serving PDF", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/work-flow")
+    public ResponseEntity<Resource> getWorkFlowPdf() {
+        try {
+            Path filePath = Paths.get(folderPath).resolve("WorkFlow").resolve("HRMS.pdf").normalize();
+            File file = filePath.toFile();
+
+            if (!file.exists() || !file.canRead()) {
+                LOG.error("File not found or not readable at: " + filePath.toString());
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new FileSystemResource(file);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"HRMS.pdf\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            LOG.error("Error serving PDF", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 

@@ -15,6 +15,7 @@ public class EvaluationDTO implements Serializable {
     private Long evaluationId;
     private Long requisitionId;
     private Long traineeId;
+    private Long preparedBy;
     private Long courseId;
     private String impact;
     private String courseName;
