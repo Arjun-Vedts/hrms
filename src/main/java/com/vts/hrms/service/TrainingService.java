@@ -346,8 +346,9 @@ public class TrainingService {
         if (fromDate != null && toDate != null) {
             requisitions = requisitions.stream()
                     .filter(r -> r.getFromDate() != null
+                            && r.getToDate() != null
                             && !r.getFromDate().isBefore(fromDate)
-                            && !r.getFromDate().isAfter(toDate))
+                            && !r.getToDate().isAfter(toDate))
                     .toList();
         }
 
