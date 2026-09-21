@@ -11,6 +11,7 @@ import com.vts.hrms.repository.SignRoleAuthorityRepository;
 import com.vts.hrms.util.CommonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -55,6 +56,8 @@ public class MasterService {
         this.masterCacheService = masterCacheService;
     }
 
+    @Tool(name = "hrms_get_designations",
+            description = "Returns all active designation.")
     @Cacheable(value = "designationList")
     public List<DesignationDTO> getEmpDesigMaster() {
         log.info("Fetching designation master");

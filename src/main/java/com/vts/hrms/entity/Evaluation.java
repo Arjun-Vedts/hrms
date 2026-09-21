@@ -27,6 +27,9 @@ public class Evaluation implements Serializable {
     @Column(name = "trainee_id")
     private Long traineeId;
 
+    @Column(name = "prepared_by")
+    private Long preparedBy;
+
     @Size(max = 5)
     @Column(name = "impact", length = 5)
     private String impact;

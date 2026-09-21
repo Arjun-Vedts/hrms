@@ -161,6 +161,18 @@ public class TrainingController {
         );
     }
 
+    @GetMapping(value = "/course-by-date-range")
+    public ResponseEntity<ApiResponse> getCourseListByDateRange(@RequestParam Long orgId,
+                                                                @RequestParam LocalDate fromDate,
+                                                                @RequestParam LocalDate toDate,
+                                                                @RequestHeader String username) {
+        List<CourseDTO> list = trainingService.getCourseListByDateRange(orgId, fromDate, toDate, username);
+
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Course list fetched", list)
+        );
+    }
+
     @GetMapping(value = "/course-type")
     public ResponseEntity<ApiResponse> getCourseTypeList(@RequestHeader String username) {
         List<CourseTypeDTO> list = trainingService.getCourseTypeList(username);
@@ -664,7 +676,7 @@ public class TrainingController {
 
     @PostMapping(value = "/confirm", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse> addReqConfirmation(@ModelAttribute RequisitionDTO dto,
-                                                  @RequestHeader String username) throws IOException {
+                                                          @RequestHeader String username) throws IOException {
         RequisitionDTO data = trainingService.addConfirmation(dto, username);
 
         return ResponseEntity.ok(
@@ -674,7 +686,7 @@ public class TrainingController {
 
     @PostMapping(value = "/attend")
     public ResponseEntity<ApiResponse> addReqAttendance(@RequestBody RequisitionDTO dto,
-                                                  @RequestHeader String username) {
+                                                        @RequestHeader String username) {
         RequisitionDTO data = trainingService.addReqAttendance(dto, username);
 
         return ResponseEntity.ok(

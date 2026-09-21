@@ -77,13 +77,16 @@ public class MasterController {
 
         List<EmployeeDTO> list;
 
-        if ("ROLE_ADMIN".equalsIgnoreCase(roleName)) {
+        List<String> allowedAdminRoles = List.of("ROLE_ADMIN", "ROLE_SA_HRT", "ROLE_AD_HRT", "ROLE_DIRECTOR");
+        List<String> allowedUserRoles = List.of("ROLE_USER", "ROLE_CAG_DIV", "ROLE_SM_HRT");
+
+        if (allowedAdminRoles.stream().anyMatch(role -> role.equalsIgnoreCase(roleName))) {
 
             list = activeEmployees.stream()
                     .sorted(employeeComparator)
                     .toList();
 
-        } else if ("ROLE_USER".equalsIgnoreCase(roleName)) {
+        } else if (allowedUserRoles.stream().anyMatch(role -> role.equalsIgnoreCase(roleName))) {
 
             list = activeEmployees.stream()
                     .filter(employee -> Objects.equals(employee.getEmpId(), empId))

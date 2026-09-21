@@ -18,7 +18,16 @@ public interface RequisitionRepository extends JpaRepository<Requisition, Long> 
 
     List<Requisition> findAllByIsAttendAndIsActive(String attend, int isActive);
 
-    List<Requisition> findAllByStatusInAndIsActive(List<String> statusCodes, int isActive);
+    @Query("""
+                SELECT r FROM Requisition r
+                WHERE r.status IN :statusCodes
+                AND r.isActive = :isActive
+                ORDER BY r.requisitionId DESC
+            """)
+    List<Requisition> findAllByStatusInAndIsActive(
+            @Param("statusCodes") List<String> statusCodes,
+            @Param("isActive") int isActive
+    );
 
     @Query("""
                 SELECT DISTINCT r
@@ -30,6 +39,7 @@ public interface RequisitionRepository extends JpaRepository<Requisition, Long> 
                   AND t.statusCode IN :statusCodes
                   AND t.isActive = 1
                   AND r.isActive = 1
+                  ORDER BY r.requisitionId DESC
             """)
     List<Requisition> findApprovalList(
             @Param("empIds") List<Long> empIds,
@@ -77,7 +87,13 @@ public interface RequisitionRepository extends JpaRepository<Requisition, Long> 
     List<Requisition> findActiveRequisitionsWithJournalId(@Param("fromDate") LocalDate fromDate,
                                                           @Param("toDate") LocalDate toDate);
 
-    List<Requisition> findAllByRequisitionIdIn(Collection<Long> requisitionIds);
+
+    @Query("""
+                SELECT r FROM Requisition r
+                WHERE r.requisitionId IN :requisitionIds
+                ORDER BY r.requisitionId DESC
+            """)
+    List<Requisition> findAllByRequisitionIdIn(@Param("requisitionIds") Collection<Long> requisitionIds);
 
     @Query("""
                 SELECT new com.vts.hrms.dto.FeedbackDTO(
