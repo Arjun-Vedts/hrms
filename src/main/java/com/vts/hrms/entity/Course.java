@@ -59,6 +59,10 @@ public class Course implements Serializable {
     @Column(name = "no_of_nomination")
     private Long noOfNomination;
 
+    @Size(max = 255)
+    @Column(name = "brochure_name", length = 255)
+    private String brochureName;
+
     @Size(max = 100)
     @Column(name = "created_by", length = 100)
     private String createdBy;

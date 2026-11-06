@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,6 +47,7 @@ public class AdminService {
     private final HandingOverRepository handingOverRepository;
     private final HandingOverMapper handingOverMapper;
     private final CashLimitRepository cashLimitRepository;
+    private final ObjectMapper objectMapper;
 
 
     @Value("${x_api_key}")
@@ -59,7 +61,7 @@ public class AdminService {
 
     private DateTimeFormatter formatter;
 
-    public AdminService(RoleRepository roleRepository, LoginRepository loginRepository, RoleSecurityRepository roleSecurityRepository, MasterClientService masterClient, FormModuleRepository formModuleRepository, FormDetailRepository formDetailRepository, FormRoleAccessRepository formRoleAccessRepository, NotificationRepository notificationRepository, MasterCacheService masterCacheService, AuditStampingRepository auditStampingRepository, HandingOverRepository handingOverRepository, HandingOverMapper handingOverMapper, CashLimitRepository cashLimitRepository) {
+    public AdminService(RoleRepository roleRepository, LoginRepository loginRepository, RoleSecurityRepository roleSecurityRepository, MasterClientService masterClient, FormModuleRepository formModuleRepository, FormDetailRepository formDetailRepository, FormRoleAccessRepository formRoleAccessRepository, NotificationRepository notificationRepository, MasterCacheService masterCacheService, AuditStampingRepository auditStampingRepository, HandingOverRepository handingOverRepository, HandingOverMapper handingOverMapper, CashLimitRepository cashLimitRepository, ObjectMapper objectMapper) {
         this.roleRepository = roleRepository;
         this.loginRepository = loginRepository;
         this.roleSecurityRepository = roleSecurityRepository;
@@ -73,6 +75,7 @@ public class AdminService {
         this.handingOverRepository = handingOverRepository;
         this.handingOverMapper = handingOverMapper;
         this.cashLimitRepository = cashLimitRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Cacheable(value = "roleList")
@@ -721,30 +724,39 @@ public class AdminService {
 
             String[] parts = license.split("\\.");
 
-            if (parts.length < 2) {
-                log.warn("Invalid JWT format");
+            if (parts.length != 3 || parts[1].isBlank()) {
+                log.warn("Invalid license JWT format");
                 return false;
             }
 
-            String payloadJson =
-                    new String(Base64.getUrlDecoder().decode(parts[1]));
+            String payloadJson = new String(
+                    Base64.getUrlDecoder().decode(parts[1]),
+                    StandardCharsets.UTF_8
+            );
 
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode payload = mapper.readTree(payloadJson);
+            JsonNode payload = objectMapper.readTree(payloadJson);
 
-            if (!payload.has("exp")) {
-                log.warn("JWT does not contain exp");
+            if (!payload.has("exp") || !payload.get("exp").canConvertToLong()) {
+                log.warn("License JWT has no valid expiry claim");
                 return false;
             }
 
             long exp = payload.get("exp").asLong();
-            Instant expiryInstant = Instant.ofEpochSecond(exp);
-            return expiryInstant.isAfter(Instant.now());
-        } catch (Exception e) {
-            log.error("License validation failed", e);
+
+            return Instant.ofEpochSecond(exp).isAfter(Instant.now());
+
+        } catch (IllegalArgumentException e) {
+            // Malformed Base64 or malformed token content.
+            log.warn("Invalid license token format");
             return false;
+
+        } catch (Exception e) {
+            // Unexpected infrastructure/configuration errors must propagate.
+            log.error("Unexpected error during license validation", e);
+            throw new IllegalStateException("Unable to verify license", e);
         }
     }
+
 
     public Integer changePasswordForAllApplications(String token, String username, ChangePasswordDTO changePasswordDTO) {
         log.info(" Inside LoginService changePasswordForAllApplications: {} ", username);

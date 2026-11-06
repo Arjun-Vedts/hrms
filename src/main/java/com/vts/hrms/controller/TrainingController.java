@@ -8,13 +8,11 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -120,17 +118,17 @@ public class TrainingController {
         }
     }
 
-    @PostMapping(value = "/add-course")
-    public ResponseEntity<ApiResponse> addCourseData(@Valid @RequestBody CourseDTO dto, @RequestHeader String username) throws IOException {
+    @PostMapping(value = "/add-course", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse> addCourseData(@Valid @ModelAttribute CourseDTO dto, @RequestHeader String username) throws IOException {
         CourseDTO data = trainingService.addCourseData(dto, username);
         return ResponseEntity.ok(
                 new ApiResponse(true, "Course data added successfully", data)
         );
     }
 
-    @PutMapping(value = "/edit-course")
-    public ResponseEntity<ApiResponse> editCourseData(@Valid @RequestBody CourseDTO dto, @RequestHeader String username) throws IOException {
-        Optional<CourseDTO> data = trainingService.editCourseData(dto, username);
+    @PutMapping(value = "/edit-course", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse> editCourseData(@Valid @ModelAttribute CourseDTO dto, @RequestHeader String username) throws IOException {
+        CourseDTO data = trainingService.editCourseData(dto, username);
         return ResponseEntity.ok(
                 new ApiResponse(true, "Course data edited successfully", data)
         );
@@ -702,5 +700,28 @@ public class TrainingController {
                 new ApiResponse(true, "Lab details fetched successfully", data)
         );
     }
+
+    @GetMapping("/course-brochure/{courseId}")
+    public ResponseEntity<Resource> downloadCourseBrochure(@PathVariable Long courseId) throws IOException {
+
+        Resource resource = trainingService.downloadCourseBrochure(courseId);
+
+        String filename = resource.getFilename();
+        String contentType = Files.probeContentType(resource.getFile().toPath());
+
+        if (contentType == null) {
+            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(filename, StandardCharsets.UTF_8)
+                                .build()
+                                .toString())
+                .body(resource);
+    }
+
 
 }

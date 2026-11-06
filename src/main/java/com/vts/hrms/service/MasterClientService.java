@@ -2,6 +2,7 @@ package com.vts.hrms.service;
 
 import com.vts.hrms.auth.AuthenticationRequest;
 import com.vts.hrms.dto.*;
+import com.vts.hrms.util.ErrorResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,7 @@ public interface MasterClientService {
     List<EmployeeDTO> getEmployee(@RequestHeader("X-API-KEY") String apiKey , @RequestParam("empId") long empId);
 
     @RequestMapping(value = "/getAuthenticate", method = RequestMethod.POST)
-    ResponseEntity<String> getAuthenticate(@RequestBody AuthenticationRequest authenticationRequest);
+    ResponseEntity<ErrorResponse> getAuthenticate(@RequestBody AuthenticationRequest authenticationRequest);
 
     @GetMapping("/getProjectMaster")
     List<ProjectMasterDTO> getProjectMasterList(@RequestHeader("X-API-KEY") String apiKey);

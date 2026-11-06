@@ -1,22 +1,19 @@
 package com.vts.hrms.auth;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.Set;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class AuthenticationResponse {
 
-    private final String token;
-    private final Set<String> roles; // Add this field
-    private final Set<String> hindiRoles;
-
-    public AuthenticationResponse(String token,Set<String> roles,Set<String> hindiRoles) {
-        this.token = token;
-        this.roles = roles;
-        this.hindiRoles = hindiRoles;
-    }
-
-    public String getToken() { return token; }
-    public Set<String> getRoles() { return roles; }
-    public Set<String> getHindiRoles() { return hindiRoles;}
-
+    private String token;
+    private Set<String> roles;
+    private Set<String> hindiRoles;
+    private String statusCode;
 
 }

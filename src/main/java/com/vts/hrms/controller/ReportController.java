@@ -87,9 +87,11 @@ public class ReportController {
     }
 
     @GetMapping("/annual-training")
-    public ResponseEntity<ApiResponse> getAnnualTrainingReport(@RequestParam LocalDate fromDate, @RequestParam LocalDate toDate, @RequestHeader String username) {
+    public ResponseEntity<ApiResponse> getAnnualTrainingReport(@RequestParam LocalDate fromDate,
+                                                               @RequestParam LocalDate toDate,
+                                                               @RequestHeader("Authorization") String token) {
         LOG.info(" Request to fetch annual training report list for period {} - {} ", fromDate, toDate);
-        List<AnnualTrainingReportDTO> list = reportsService.getAnnualTrainingReport(fromDate,toDate);
+        List<AnnualTrainingReportDTO> list = reportsService.getAnnualTrainingReport(fromDate,toDate, token);
         return ResponseEntity.ok(
                 new ApiResponse(true, "Annual training report list fetched successfully", list)
         );
@@ -105,9 +107,9 @@ public class ReportController {
     }
 
     @GetMapping("/gender-budgeting")
-    public ResponseEntity<ApiResponse> getGenderBudgetReport(@RequestHeader String username) {
+    public ResponseEntity<ApiResponse> getGenderBudgetReport(@RequestHeader("Authorization") String token) {
         LOG.info(" Request to fetch gender budgeting report list");
-        List<GenderBudgetDTO> data = reportsService.getGenderBudgetReport(username);
+        List<GenderBudgetDTO> data = reportsService.getGenderBudgetReport(token);
         return ResponseEntity.ok(
                 new ApiResponse(true, "Gender budget report list fetched successfully", data)
         );

@@ -38,6 +38,9 @@ public class Login {
     @Column(name = "emp_id")
     private Long empId;
 
+    @Column(name = "is_default_password")
+    private String isDefaultPassword;
+
     @Column(name = "created_by")
     private String createdBy;
 
