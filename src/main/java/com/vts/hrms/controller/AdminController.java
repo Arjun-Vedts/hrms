@@ -1,7 +1,6 @@
 package com.vts.hrms.controller;
 
 
-
 import com.vts.hrms.dto.*;
 import com.vts.hrms.entity.AuditStamping;
 import com.vts.hrms.entity.CashLimit;
@@ -48,10 +47,10 @@ public class AdminController {
     private final LoginRepository loginRepository;
     private DateTimeFormatter formatter;
 
-    public AdminController(AdminService adminService,LoginRepository loginRepository) {
+    public AdminController(AdminService adminService, LoginRepository loginRepository) {
 
         this.adminService = adminService;
-        this.loginRepository=loginRepository;
+        this.loginRepository = loginRepository;
     }
 
 
@@ -102,19 +101,19 @@ public class AdminController {
     }
 
     @PostMapping(value = "/role-update")
-    public ResponseEntity<String> roleUpdate(@RequestHeader String username, @RequestBody UserResponseDTO dto) throws Exception{
-        LOG.info( "Inside roleUpdate : username :{} , dto : {} ", username, dto);
+    public ResponseEntity<String> roleUpdate(@RequestHeader String username, @RequestBody UserResponseDTO dto) throws Exception {
+        LOG.info("Inside roleUpdate : username :{} , dto : {} ", username, dto);
         try {
-            Login login = loginRepository.findByUsernameAndIsActive(dto.getUsername(),1);
-            if(login!=null) {
+            Login login = loginRepository.findByUsernameAndIsActive(dto.getUsername(), 1);
+            if (login != null) {
                 dto.setLoginId(login.getLoginId());
                 adminService.updateUser(dto, username);
-            }else {
-               adminService.addNewUser(dto, username);
+            } else {
+                adminService.addNewUser(dto, username);
             }
-            return new ResponseEntity<>("200" , HttpStatus.OK);
+            return new ResponseEntity<>("200", HttpStatus.OK);
         } catch (Exception e) {
-            LOG.error("Error fetching userInsert:{} ",e.getMessage());
+            LOG.error("Error fetching userInsert:{} ", e.getMessage());
             return ResponseEntity.status(500).body("Error occurred: " + e.getMessage());
         }
     }
@@ -238,11 +237,10 @@ public class AdminController {
     }
 
 
-
     @PostMapping(value = "/get-role-username")
     public List<Long> getRoleByUsername(@RequestHeader String username) {
         try {
-            Login login = loginRepository.findByUsernameAndIsActive(username,1);
+            Login login = loginRepository.findByUsernameAndIsActive(username, 1);
 
             List<Long> roleIds = login.getRoleSecurity().stream()
                     .map(RoleSecurity::getRoleId)
@@ -263,11 +261,10 @@ public class AdminController {
     public ResponseEntity<List<AuditStampingDTO>> auditStampingList(@RequestHeader String username,
                                                                     @RequestParam String selUser,
                                                                     @RequestParam LocalDate fromDate,
-                                                                    @RequestParam LocalDate toDate) throws Exception
-    {
+                                                                    @RequestParam LocalDate toDate) throws Exception {
         try {
 
-            LOG.info("Inside auditStampingList | User: {},fromDate: {},toDate: {}", username,fromDate,toDate);
+            LOG.info("Inside auditStampingList | User: {},fromDate: {},toDate: {}", username, fromDate, toDate);
 
             List<AuditStampingDTO> dto = adminService.auditStampingList(selUser, fromDate, toDate);
 
@@ -278,38 +275,77 @@ public class AdminController {
         }
     }
 
-    @PostMapping(value="custom-audit-stamping-login")
-    public String logIn(@RequestBody String username, Authentication authentication, HttpServletRequest request)throws Exception {
-        LOG.info(" Inside custom-audit-stamping-login: user:{}, ",username);
-        long result=0;
-        username = username.replace("\"", "");
-        String IpAddress;
-        try{
-            IpAddress = request.getRemoteAddr();
-            if("0:0:0:0:0:0:0:1".equalsIgnoreCase(IpAddress))
-            {
-                InetAddress ip = InetAddress.getLocalHost();
-                IpAddress= ip.getHostAddress();
+
+    @PostMapping(value = "custom-audit-stamping-login")
+    public String logIn(@RequestBody String username,
+                        Authentication authentication,
+                        HttpServletRequest request) {
+
+        LOG.info("========== LOGIN AUDIT STAMPING STARTED ==========");
+
+        long result = 0;
+
+        try {
+            username = username.replace("\"", "").trim();
+
+            LOG.info("Login username: {}", username);
+
+            String ipAddress = getClientIpAddress(request);
+
+            LOG.info("Client IP Address: {}", ipAddress);
+            LOG.info("Remote Address: {}", request.getRemoteAddr());
+            LOG.info("X-Forwarded-For: {}", request.getHeader("X-Forwarded-For"));
+            LOG.info("X-Real-IP: {}", request.getHeader("X-Real-IP"));
+
+            Login login = loginRepository.findByUsernameAndIsActive(username, 1);
+
+            if (login == null) {
+                LOG.warn("No active login found for username: {}", username);
+                return "0";
             }
-        }
-        catch(Exception e)
-        {
-            IpAddress="Not Available";
-        }
-        try{
-            Login login = loginRepository.findByUsernameAndIsActive(username,1);
-            AuditStamping stamping=new AuditStamping();
+
+            AuditStamping stamping = new AuditStamping();
+
             stamping.setLoginId(login.getLoginId());
             stamping.setLoginDate(LocalDate.now());
             stamping.setLoginDatetime(LocalDateTime.now());
             stamping.setUsername(login.getUsername());
-            stamping.setIpAddress(IpAddress);
-            result = adminService.loginStampingInsert(stamping);
-        }catch (Exception e) {
-            LOG.error("Error in custom-audit-stamping-login: {}", e.getMessage(), e);
-        }
-        return String.valueOf(result);
+            stamping.setIpAddress(ipAddress);
 
+            LOG.info("Saving login audit stamping for user: {}", username);
+
+            result = adminService.loginStampingInsert(stamping);
+
+            LOG.info("Login audit stamping saved successfully. Result: {}", result);
+
+        } catch (Exception e) {
+            LOG.error("Error in custom-audit-stamping-login for user: {}",
+                    username, e);
+        }
+
+        LOG.info("========== LOGIN AUDIT STAMPING COMPLETED ==========");
+
+        return String.valueOf(result);
+    }
+
+
+    private String getClientIpAddress(HttpServletRequest request) {
+
+        String ipAddress = request.getHeader("X-Forwarded-For");
+
+        if (ipAddress != null && !ipAddress.isBlank()) {
+            // First IP in the forwarded list is generally the original client
+            ipAddress = ipAddress.split(",")[0].trim();
+            return ipAddress;
+        }
+
+        ipAddress = request.getHeader("X-Real-IP");
+
+        if (ipAddress != null && !ipAddress.isBlank()) {
+            return ipAddress.trim();
+        }
+
+        return request.getRemoteAddr();
     }
 
 
@@ -347,12 +383,12 @@ public class AdminController {
     }
 
     @PutMapping(value = "/change-password")
-    public ResponseEntity<String> updatePassword(@RequestHeader String username,@RequestBody ChangePasswordDTO dto){
-        LOG.info("REST request to change password for user :{}",username);
+    public ResponseEntity<String> updatePassword(@RequestHeader String username, @RequestBody ChangePasswordDTO dto) {
+        LOG.info("REST request to change password for user :{}", username);
         try {
             Integer count = adminService.changePassword(dto);
-            if(count > 0){
-                return ResponseEntity.ok(count+"");
+            if (count > 0) {
+                return ResponseEntity.ok(count + "");
             }
             return ResponseEntity.badRequest().body("0");
 
@@ -362,22 +398,30 @@ public class AdminController {
         }
     }
 
-    @GetMapping(value = "/get-license")
+
+    @GetMapping("/get-license")
     public ResponseEntity<Boolean> getLicense() {
-        LOG.info("Inside getLicense()");
+        LOG.info("Checking application license");
+
         try {
-            boolean isValid = adminService.getLicense();
+            boolean isValid = Boolean.TRUE.equals(adminService.getLicense());
+
+            // HTTP 200 + false means the license is invalid or expired.
             return ResponseEntity.ok(isValid);
+
         } catch (Exception e) {
-            LOG.error("Error in getLicense: {}", e.getMessage(), e);
+            LOG.error("License verification failed because of a server error", e);
+
+            // Do not return HTTP 200 + false for an internal error.
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(false);
+                    .body(null);
         }
     }
 
+
     @PutMapping(value = "/update-password")
-    public String updatePassword(@RequestHeader String username, @RequestBody ChangePasswordDTO changePasswordDTO, @RequestHeader(value = "Authorization", required = false) String token){
-        LOG.info(" Inside Update-password user :{}",username);
+    public String updatePassword(@RequestHeader String username, @RequestBody ChangePasswordDTO changePasswordDTO, @RequestHeader(value = "Authorization", required = false) String token) {
+        LOG.info(" Inside Update-password user :{}", username);
         changePasswordDTO.setUsername(username);
         Integer count = adminService.changePasswordForAllApplications(token, username, changePasswordDTO);
         return String.valueOf(count);
@@ -385,14 +429,14 @@ public class AdminController {
 
     @GetMapping(value = "/handing-over")
     public ResponseEntity<ApiResponse> getHandingOverList(@RequestHeader String username, @RequestParam LocalDate fromDate, @RequestParam LocalDate toDate) {
-        LOG.info(" Inside getHandingOverList user :{}, fromDate:{}, toDate:{}",username, fromDate, toDate);
+        LOG.info(" Inside getHandingOverList user :{}, fromDate:{}, toDate:{}", username, fromDate, toDate);
         List<HandingOverDTO> list = adminService.getHandingOverList(username, fromDate, toDate);
         return ResponseEntity.ok(new ApiResponse(true, "Handing Over list fetched", list));
     }
 
     @PostMapping(value = "/add-handing-over")
     public ResponseEntity<ApiResponse> insertHandingOver(@RequestBody HandingOverDTO dto, @RequestHeader String username) {
-        if(adminService.existOverlappingDateRange(dto, "insert")){
+        if (adminService.existOverlappingDateRange(dto, "insert")) {
             return ResponseEntity.ok(
                     new ApiResponse(false, "A handing over record already exists for the selected period.", null)
             );
@@ -405,7 +449,7 @@ public class AdminController {
 
     @PutMapping(value = "/update-handing-over")
     public ResponseEntity<ApiResponse> updateHandingOver(@RequestBody HandingOverDTO dto, @RequestHeader String username) {
-        if(adminService.existOverlappingDateRange(dto, "update")){
+        if (adminService.existOverlappingDateRange(dto, "update")) {
             return ResponseEntity.ok(
                     new ApiResponse(false, "A handing over record already exists for the selected period.", null)
             );

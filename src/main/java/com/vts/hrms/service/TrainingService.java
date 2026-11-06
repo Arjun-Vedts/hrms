@@ -16,6 +16,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -186,13 +188,35 @@ public class TrainingService {
 
     @CacheEvict(value = "courseCache", allEntries = true)
     @Transactional
-    public CourseDTO addCourseData(@Valid CourseDTO dto, String username) {
-        log.info("Request to add course {} by {}", dto.getCourseName(), username);
+    public CourseDTO addCourseData(@Valid CourseDTO dto, String username) throws IOException {
+
+        log.info("Starting course creation. Course Name: {}, Created By: {}", dto.getCourseName(), username);
+
         Course course = courseMapper.toEntity(dto);
         course.setCreatedBy(username);
         course.setCreatedDate(LocalDateTime.now());
         course.setIsActive(1);
+
+        // Upload course brochure
+        if (dto.getMultipartFileBrochure() != null && !dto.getMultipartFileBrochure().isEmpty()) {
+
+            Path filepath = Paths.get(appStorage, "Course Brochure");
+
+            String originalFilename = dto.getMultipartFileBrochure().getOriginalFilename();
+            String brochureName = System.currentTimeMillis() + "_" + originalFilename;
+
+            log.info("Uploading course brochure: {}", originalFilename);
+
+            FileStorageUtil.saveFile(filepath, brochureName, dto.getMultipartFileBrochure());
+
+            course.setBrochureName(brochureName);
+
+            log.info("Course brochure uploaded successfully: {}", brochureName);
+        }
+
         course = courseRepository.save(course);
+
+        log.info("Course saved successfully. Course ID: {}, Course Name: {}", course.getCourseId(), course.getCourseName());
 
         Organizer organizer = organizerRepository.findById(course.getOrganizerId())
                 .orElseThrow(() -> new NotFoundException("Organizer data not found"));
@@ -200,8 +224,11 @@ public class TrainingService {
         CourseDTO courseDTO = courseMapper.toDto(course);
         courseDTO.setOrganizer(organizer.getOrganizer());
 
+        log.info("Course creation completed successfully. Course ID: {}, Created By: {}", course.getCourseId(), username);
+
         return courseDTO;
     }
+
 
     @Transactional(readOnly = true)
     public List<CourseDTO> getCourseList(Long orgId, String username) {
@@ -757,20 +784,61 @@ public class TrainingService {
 
     @CacheEvict(value = "courseCache", allEntries = true)
     @Transactional
-    public Optional<CourseDTO> editCourseData(@Valid CourseDTO dto, String username) {
-        log.info("Request to edit program id {} by {}", dto.getCourseId(), username);
+    public CourseDTO editCourseData(@Valid CourseDTO dto, String username) throws IOException {
 
-        return courseRepository
-                .findById(dto.getCourseId())
-                .map(existingCourse -> {
-                    existingCourse.setModifiedBy(username);
-                    existingCourse.setModifiedDate(LocalDateTime.now());
-                    courseMapper.partialUpdate(existingCourse, dto);
-                    return existingCourse;
-                })
-                .map(courseRepository::save)
-                .map(courseMapper::toDto);
+        log.info("Starting course update. Course ID: {}, Updated By: {}", dto.getCourseId(), username);
+
+        Course existingCourse = courseRepository.findById(dto.getCourseId())
+                .orElseThrow(() -> {
+                    log.error("Course not found. Course ID: {}", dto.getCourseId());
+                    return new NotFoundException("Course data not found");
+                });
+
+        courseMapper.partialUpdate(existingCourse, dto);
+
+        existingCourse.setModifiedBy(username);
+        existingCourse.setModifiedDate(LocalDateTime.now());
+
+        if (dto.getMultipartFileBrochure() != null && !dto.getMultipartFileBrochure().isEmpty()) {
+
+            Path filepath = Paths.get(appStorage, "Course Brochure");
+
+            String oldBrochureName = existingCourse.getBrochureName();
+            if (oldBrochureName != null && !oldBrochureName.isBlank()) {
+                Path oldFilePath = filepath.resolve(oldBrochureName);
+                if (Files.deleteIfExists(oldFilePath)) {
+                    log.info("Old course brochure deleted successfully. Course ID: {}, File: {}", dto.getCourseId(), oldBrochureName);
+                } else {
+                    log.warn("Old course brochure not found. Course ID: {}, File: {}", dto.getCourseId(), oldBrochureName);
+                }
+            }
+
+            String originalFilename = dto.getMultipartFileBrochure().getOriginalFilename();
+            String brochureName = System.currentTimeMillis() + "_" + originalFilename;
+
+            log.info("Uploading new course brochure. Course ID: {}, File: {}", dto.getCourseId(), originalFilename);
+
+            FileStorageUtil.saveFile(filepath, brochureName, dto.getMultipartFileBrochure());
+            existingCourse.setBrochureName(brochureName);
+
+            log.info("New course brochure uploaded successfully. Course ID: {}, File: {}", dto.getCourseId(), brochureName);
+        }
+
+        Course updatedCourse = courseRepository.save(existingCourse);
+
+        log.info("Course updated successfully. Course ID: {}, Course Name: {}", updatedCourse.getCourseId(), updatedCourse.getCourseName());
+
+        Organizer organizer = organizerRepository.findById(updatedCourse.getOrganizerId())
+                .orElseThrow(() -> new NotFoundException("Organizer data not found"));
+
+        CourseDTO responseDTO = courseMapper.toDto(updatedCourse);
+        responseDTO.setOrganizer(organizer.getOrganizer());
+
+        log.info("Course update completed successfully. Course ID: {}, Updated By: {}", updatedCourse.getCourseId(), username);
+
+        return responseDTO;
     }
+
 
     @CacheEvict(value = "organizerCache", allEntries = true)
     public OrganizerDTO addOrganizer(@Valid OrganizerDTO dto, String username) {
@@ -2674,4 +2742,40 @@ public class TrainingService {
 
         return dtoList;
     }
+
+    public Resource downloadCourseBrochure(Long courseId) throws IOException {
+
+        log.info("Fetching brochure for Course ID: {}", courseId);
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new NotFoundException("Course data not found"));
+
+        String brochureName = course.getBrochureName();
+
+        if (brochureName == null || brochureName.isBlank()) {
+            throw new NotFoundException("Course brochure not found");
+        }
+
+        Path filePath = Paths.get(appStorage, "Course Brochure")
+                .resolve(brochureName)
+                .normalize();
+
+        Path brochureDirectory = Paths.get(appStorage, "Course Brochure")
+                .toAbsolutePath()
+                .normalize();
+
+        if (!filePath.toAbsolutePath().startsWith(brochureDirectory)) {
+            throw new SecurityException("Invalid brochure file path");
+        }
+
+        if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
+            log.warn("Brochure file does not exist. Course ID: {}, File: {}", courseId, brochureName);
+            throw new NotFoundException("Course brochure file not found");
+        }
+
+        log.info("Brochure file found successfully. Course ID: {}, File: {}", courseId, brochureName);
+
+        return new UrlResource(filePath.toUri());
+    }
+
 }

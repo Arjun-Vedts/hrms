@@ -52,7 +52,7 @@ public class JwtUtil {
         }if (roles.contains(new SimpleGrantedAuthority("ROLE_GHDH"))) {
             claims.put("isGhDh", true);
         }if (roles.contains(new SimpleGrantedAuthority("ROLE_AD_HRT"))) {
-            claims.put("isAdHrT", true);
+            claims.put("isAdHrt", true);
         }if (roles.contains(new SimpleGrantedAuthority("ROLE_SM_HRT"))) {
             claims.put("isSmHrt", true);
         }if (roles.contains(new SimpleGrantedAuthority("ROLE_PROJECT_DIRECTOR"))) {
@@ -119,7 +119,7 @@ public class JwtUtil {
         if (Boolean.TRUE.equals(claims.get("isDh", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_DH"));
         if (Boolean.TRUE.equals(claims.get("isGh", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_GH"));
         if (Boolean.TRUE.equals(claims.get("isGhDh", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_GHDH"));
-        if (Boolean.TRUE.equals(claims.get("isAdHrT", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_AD_HRT"));
+        if (Boolean.TRUE.equals(claims.get("isAdHrt", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_AD_HRT"));
         if (Boolean.TRUE.equals(claims.get("isSmHrt", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_SM_HRT"));
         if (Boolean.TRUE.equals(claims.get("isProjectDirector", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_PROJECT_DIRECTOR"));
         if (Boolean.TRUE.equals(claims.get("isSaHrt", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_SA_HRT"));
@@ -127,6 +127,19 @@ public class JwtUtil {
         if (Boolean.TRUE.equals(claims.get("isTcgDiv", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_TCG_DIV"));
         if (Boolean.TRUE.equals(claims.get("isAdmDiv", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_ADMIN_DIV"));
         if (Boolean.TRUE.equals(claims.get("isDirector", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_DIRECTOR"));
+        if (Boolean.TRUE.equals(claims.get("isCaseWorker", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_CASE_WORKER"));
+        if (Boolean.TRUE.equals(claims.get("isApprover", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_APPROVER"));
+        if (Boolean.TRUE.equals(claims.get("isStores", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_STORES"));
+        if (Boolean.TRUE.equals(claims.get("isMmg", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_MMG"));
+        if (Boolean.TRUE.equals(claims.get("isAch", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_ACH"));
+        if (Boolean.TRUE.equals(claims.get("isCoord", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_COORD"));
+        if (Boolean.TRUE.equals(claims.get("isDispatch", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_DISPATCH"));
+        if (Boolean.TRUE.equals(claims.get("isAccountOfficer", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_ACCOUNT_OFFICER"));
+        if (Boolean.TRUE.equals(claims.get("isAdm1", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_ADM1"));
+        if (Boolean.TRUE.equals(claims.get("isAdm2", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_ADM2"));
+        if (Boolean.TRUE.equals(claims.get("isAdm3", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_ADM3"));
+        if (Boolean.TRUE.equals(claims.get("isSeuHead", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_SEU_HEAD"));
+        if (Boolean.TRUE.equals(claims.get("isIso", Boolean.class))) roles.add(new SimpleGrantedAuthority("ROLE_ISO"));
 
         return roles;
     }

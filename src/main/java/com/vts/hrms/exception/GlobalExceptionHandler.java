@@ -91,11 +91,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(ExcelValidationException.class)
-    public ResponseEntity<ApiResponse> handleExcelValidation(ExcelValidationException ex) {
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Excel validation failed", ex.getErrors()));
-    }
 
     // ✅ SQL / JPA constraint violations (most common)
     @ExceptionHandler(DataIntegrityViolationException.class)

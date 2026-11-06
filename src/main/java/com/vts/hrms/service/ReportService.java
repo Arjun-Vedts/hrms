@@ -53,6 +53,7 @@ public class ReportService {
     private final SponsorshipMapper sponsorshipMapper;
     private final DistributionRepository distributionRepository;
     private final DistributionMapper distributionMapper;
+    private final FeedbackRepository feedbackRepository;
 
 
     @Cacheable(value = "getNominalROllList")
@@ -282,7 +283,7 @@ public class ReportService {
                 .toList();
     }
 
-    @Cacheable(value = "cepReportCache",key = "#fromDate + '_' + #toDate + '_' + #username")
+    @Cacheable(value = "cepReportCache", key = "#fromDate + '_' + #toDate + '_' + #username")
     public List<CepDTO> getCEPData(LocalDate fromDate, LocalDate toDate, String username) {
         log.info("Fetching CEP list data from {} to {}", fromDate, toDate);
 
@@ -317,18 +318,18 @@ public class ReportService {
         return dtoList;
     }
 
-    @Cacheable(value = "mtechReportCache",key = "#fromDate + '_' + #toDate")
+    @Cacheable(value = "mtechReportCache", key = "#fromDate + '_' + #toDate")
     public List<SponsorshipDTO> getMTechData(LocalDate fromDate, LocalDate toDate) {
         log.info("Fetching Sponsorship M.Tech list data");
 
-        List<Sponsorship> list = sponsorshipRepository.findByDegreeTypeAndDateRange("MTECH",fromDate,toDate);
+        List<Sponsorship> list = sponsorshipRepository.findByDegreeTypeAndDateRange("MTECH", fromDate, toDate);
         List<SponsorshipDTO> dtoList = sponsorshipMapper.toDto(list);
 
         Map<Long, EmployeeDTO> employeeDTOMap = masterCacheService.getLongEmployeeDTOMap();
 
         dtoList.forEach(data -> {
             EmployeeDTO employeeDTO = employeeDTOMap.get(data.getEmpId());
-            if(employeeDTO!=null) {
+            if (employeeDTO != null) {
                 data.setEmpNo(employeeDTO.getEmpNo());
                 data.setEmployeeName(CommonUtil.buildEmployeeName(employeeDTO, false));
                 data.setEmpDesigCode(employeeDTO.getEmpDesigName());
@@ -340,18 +341,18 @@ public class ReportService {
         return dtoList;
     }
 
-    @Cacheable(value = "phdReportCache",key = "#fromDate + '_' + #toDate")
+    @Cacheable(value = "phdReportCache", key = "#fromDate + '_' + #toDate")
     public List<SponsorshipDTO> getPhdData(LocalDate fromDate, LocalDate toDate) {
         log.info("Fetching Sponsorship Phd list data");
 
-        List<Sponsorship> list = sponsorshipRepository.findByDegreeTypeAndDateRange("PHD",fromDate,toDate);
+        List<Sponsorship> list = sponsorshipRepository.findByDegreeTypeAndDateRange("PHD", fromDate, toDate);
         List<SponsorshipDTO> dtoList = sponsorshipMapper.toDto(list);
 
         Map<Long, EmployeeDTO> employeeDTOMap = masterCacheService.getLongEmployeeDTOMap();
 
         dtoList.forEach(data -> {
             EmployeeDTO employeeDTO = employeeDTOMap.get(data.getEmpId());
-            if(employeeDTO!=null) {
+            if (employeeDTO != null) {
                 data.setEmpNo(employeeDTO.getEmpNo());
                 data.setEmployeeName(CommonUtil.buildEmployeeName(employeeDTO, false));
                 data.setEmpDesigCode(employeeDTO.getEmpDesigName());
@@ -363,11 +364,11 @@ public class ReportService {
         return dtoList;
     }
 
-    @Cacheable(value = "hrDistributionReportCache",key = "#fromDate + '_' + #toDate")
+    @Cacheable(value = "hrDistributionReportCache", key = "#fromDate + '_' + #toDate")
     public List<DistributionDTO> getHrDistributionData(LocalDate fromDate, LocalDate toDate) {
         log.info("Fetching HR distribution list data");
 
-        List<Distribution> list = distributionRepository.findActiveDistributionsByDateRange(fromDate,toDate);
+        List<Distribution> list = distributionRepository.findActiveDistributionsByDateRange(fromDate, toDate);
         List<DistributionDTO> dtoList = distributionMapper.toDto(list);
 
         Map<Long, List<ProjectEmployeeDto>> empProjectMap = masterCacheService.getProjectEmployeeMap();
@@ -411,120 +412,420 @@ public class ReportService {
         return dtoList;
     }
 
-    public List<AnnualTrainingReportDTO> getAnnualTrainingReport(LocalDate fromDate, LocalDate toDate) {
-        log.info("Fetching Annual training report list data");
+    public List<AnnualTrainingReportDTO> getAnnualTrainingReport(LocalDate fromDate, LocalDate toDate, String token) {
+
+        log.info("Fetching Annual Training Report. From Date: {}, To Date: {}", fromDate, toDate);
+
 
         List<Requisition> requisitions = requisitionRepository.getRequisitionDataByDateRange(fromDate, toDate);
+        List<Feedback> feedbacks = feedbackRepository.findByDateRange(fromDate, toDate);
+
         List<Course> courses = courseRepository.findAll();
         List<CourseType> courseTypes = courseTypeRepository.findAll();
 
+        List<EmployeeDTO> employeeDTOList = getNominalRollList(token);
+
+        log.info(
+                "Annual Training Report data fetched. " +
+                        "Requisitions: {}, Feedbacks: {}, Courses: {}, CourseTypes: {}, Employees: {}",
+                requisitions.size(),
+                feedbacks.size(),
+                courses.size(),
+                courseTypes.size(),
+                employeeDTOList.size()
+        );
+
+
+        // Requisition.courseId -> Course
         Map<Long, Course> courseMap = courses.stream()
-                .collect(Collectors.toMap(Course::getCourseId, Function.identity()));
+                .filter(Objects::nonNull)
+                .filter(course -> course.getCourseId() != null)
+                .collect(Collectors.toMap(
+                        Course::getCourseId,
+                        Function.identity(),
+                        (existing, replacement) -> existing
+                ));
 
+
+        // Course.courseTypeId -> CourseType
         Map<Long, CourseType> courseTypeMap = courseTypes.stream()
-                .collect(Collectors.toMap(CourseType::getCourseTypeId, Function.identity()));
-
-        Map<Long, EmployeeDTO> employeeMap = masterCacheService.getLongEmployeeDTOMap();
-
-        // Create fixed rows
-        Map<String, AnnualTrainingReportDTO> rowMap = new LinkedHashMap<>();
-
-        rowMap.put("CEP", new AnnualTrainingReportDTO("CEP", 0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L,
-                0L, 0L));
-
-        rowMap.put("Special", new AnnualTrainingReportDTO("Special", 0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L,
-                0L, 0L));
-
-        rowMap.put("Targeted", new AnnualTrainingReportDTO("Targeted", 0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L,
-                0L, 0L));
-
-        rowMap.put("Foreign", new AnnualTrainingReportDTO("Foreign", 0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L,
-                0L, 0L));
-
-        rowMap.put("Techno Managerial", new AnnualTrainingReportDTO("Techno Managerial", 0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L,
-                0L, 0L));
-
-        rowMap.put("Seminar", new AnnualTrainingReportDTO("Seminar/Symposium/Conference/Workshop", 0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L, 0L,
-                0L, 0L, 0L, 0L,
-                0L, 0L));
+                .filter(Objects::nonNull)
+                .filter(courseType -> courseType.getCourseTypeId() != null)
+                .collect(Collectors.toMap(
+                        CourseType::getCourseTypeId,
+                        Function.identity(),
+                        (existing, replacement) -> existing
+                ));
 
 
-        for (Requisition req : requisitions) {
+        // Feedback.requisitionId -> Requisition
+        Map<Long, Requisition> requisitionMap = requisitions.stream()
+                .filter(Objects::nonNull)
+                .filter(req -> req.getRequisitionId() != null)
+                .collect(Collectors.toMap(
+                        Requisition::getRequisitionId,
+                        Function.identity(),
+                        (existing, replacement) -> existing
+                ));
 
-            Course course = courseMap.get(req.getCourseId());
-            if (course == null) continue;
 
-            CourseType type = courseTypeMap.get(course.getCourseTypeId());
-            if (type == null) continue;
+        // Requisition.initiatingOfficer -> EmployeeDTO
+        Map<Long, EmployeeDTO> employeeMap = employeeDTOList.stream()
+                .filter(Objects::nonNull)
+                .filter(emp -> emp.getEmpId() != null)
+                .collect(Collectors.toMap(
+                        EmployeeDTO::getEmpId,
+                        Function.identity(),
+                        (existing, replacement) -> existing
+                ));
 
-            String courseType = type.getCourseType();
-            String level = course.getCourseLevel();
 
-            AnnualTrainingReportDTO dto = null;
+        // IMPORTANT:
+        // Every CourseType will appear in the report even when
+        // there are no participants.
+        Map<Long, AnnualTrainingReportDTO> reportMap = new LinkedHashMap<>();
 
-            // Decide row
-            if ("CEP".equalsIgnoreCase(courseType)) {
-                dto = rowMap.get("CEP");
-            } else if ("Special".equalsIgnoreCase(courseType)) {
-                dto = rowMap.get("Special");
-            } else if ("Targeted".equalsIgnoreCase(courseType)) {
-                dto = rowMap.get("Targeted");
-            } else if ("Techno Managerial".equalsIgnoreCase(courseType)) {
-                dto = rowMap.get("Techno Managerial");
-            } else if ("Training".equalsIgnoreCase(courseType)
-                    && "International".equalsIgnoreCase(level)) {
-                dto = rowMap.get("Foreign");
-            } else if (Stream.of("Seminar", "Symposium", "Conference", "Workshop").anyMatch(courseType::equalsIgnoreCase)) {
-                dto = rowMap.get("Seminar");
+        for (CourseType courseType : courseTypes) {
+
+            if (courseType == null || courseType.getCourseTypeId() == null) {
+                log.warn("Skipping CourseType because CourseType ID is null");
+                continue;
             }
 
-            if (dto == null) continue;
+            AnnualTrainingReportDTO dto = new AnnualTrainingReportDTO();
 
-            EmployeeDTO emp = employeeMap.get(req.getInitiatingOfficer());
-            if (emp == null) continue;
+            dto.setCourseTypeId(courseType.getCourseTypeId());
+            dto.setCourse(courseType.getCourseType());
 
-            String cadre = emp.getDesigCadre();
-
-            // Cadre classification
-            if ("DRDS".equalsIgnoreCase(cadre)) {
-                dto.setDrdsTotal(dto.getDrdsTotal() + 1);
-            } else if ("DRTC".equalsIgnoreCase(cadre)) {
-                dto.setDrtcTotal(dto.getDrtcTotal() + 1);
-            } else if ("Admin&Allied".equalsIgnoreCase(cadre)) {
-                dto.setAdminAlliedTotal(dto.getAdminAlliedTotal() + 1);
-            } else {
-                dto.setOthersTotal(dto.getOthersTotal() + 1);
-            }
+            // Explicitly initialize fields that currently
+            dto.setWithinLab(0L);
+            dto.setOtherLabs(0L);
+            reportMap.put(courseType.getCourseTypeId(), dto);
         }
 
-        return new ArrayList<>(rowMap.values());
+        log.info("Initialized {} dynamic course type report rows", reportMap.size());
+
+
+        // =========================================================
+        // 7. Process Feedback
+        //
+        // Feedback
+        //      |
+        //      | requisitionId
+        //      v
+        // Requisition
+        //      |
+        //      | courseId
+        //      v
+        // Course
+        //      |
+        //      | courseTypeId
+        //      v
+        // CourseType / Report Row
+        //
+        // Requisition.initiatingOfficer
+        //      |
+        //      v
+        // EmployeeDTO
+        //      |
+        //      +-- desigCadre
+        //      |
+        //      +-- employeeDetails.gender
+        // =========================================================
+
+        int processedFeedbacks = 0;
+        int skippedFeedbacks = 0;
+
+        for (Feedback feedback : feedbacks) {
+
+            if (feedback == null) {
+                skippedFeedbacks++;
+                continue;
+            }
+
+            // Feedback -> Requisition
+            Long requisitionId = feedback.getRequisitionId();
+
+            if (requisitionId == null) {
+                log.debug("Skipping feedback because requisitionId is null");
+                skippedFeedbacks++;
+                continue;
+            }
+
+            Requisition requisition = requisitionMap.get(requisitionId);
+            if (requisition == null) {
+                log.debug("Skipping feedback. Requisition not found for ID: {}", requisitionId
+                );
+                skippedFeedbacks++;
+                continue;
+            }
+
+
+            // Requisition -> Course
+            Long courseId = requisition.getCourseId();
+            if (courseId == null) {
+                log.debug("Skipping requisition {} because courseId is null", requisitionId
+                );
+                skippedFeedbacks++;
+                continue;
+            }
+
+            Course course = courseMap.get(courseId);
+            if (course == null) {
+                log.debug("Skipping requisition {}. Course not found for courseId: {}", requisitionId, courseId);
+                skippedFeedbacks++;
+                continue;
+            }
+
+            // Course -> CourseType
+            Long courseTypeId = course.getCourseTypeId();
+            if (courseTypeId == null) {
+                log.debug("Skipping course {} because courseTypeId is null", courseId);
+                skippedFeedbacks++;
+                continue;
+            }
+
+            CourseType courseType = courseTypeMap.get(courseTypeId);
+            if (courseType == null) {
+                log.debug("Skipping course {}. CourseType not found for ID: {}", courseId, courseTypeId);
+                skippedFeedbacks++;
+                continue;
+            }
+
+            // Find report row
+            AnnualTrainingReportDTO dto = reportMap.get(courseTypeId);
+            if (dto == null) {
+                log.debug("Skipping feedback {}. Report row not found for courseTypeId: {}", feedback.getRequisitionId(), courseTypeId);
+                skippedFeedbacks++;
+                continue;
+            }
+
+
+            // Requisition -> Employee
+            Long employeeId = requisition.getInitiatingOfficer();
+            if (employeeId == null) {
+                log.debug("Skipping requisition {} because initiatingOfficer is null", requisitionId);
+                skippedFeedbacks++;
+                continue;
+            }
+
+
+            EmployeeDTO employee = employeeMap.get(employeeId);
+            if (employee == null) {
+                log.debug("Skipping requisition {}. Employee not found for employeeId: {}", requisitionId, employeeId);
+                skippedFeedbacks++;
+                continue;
+            }
+
+            // Get cadre
+            String cadre = normalize(employee.getDesigCadre());
+
+            // Get gender
+            String gender = "";
+            if (employee.getEmployeeDetails() != null) {
+                gender = normalize(employee.getEmployeeDetails().getGender());
+            }
+
+            // Get requestThrough
+            String requestThrough = normalize(feedback.getRequestThrough());
+
+
+            // Update course level counts
+            // National      -> Outside Within India
+            // International -> Outside Foreign Agency
+            // Within Lab    -> 0
+            // Other Labs    -> 0
+            updateCourseLevelCount(dto, course.getCourseLevel());
+
+
+            // Sub Total
+            // Every valid feedback represents one participant
+            dto.setSubTotal(increment(dto.getSubTotal()));
+
+            // Update cadre/request-through/gender counts
+            updateCadreCounts(dto, cadre, requestThrough, gender);
+            processedFeedbacks++;
+        }
+
+        log.info(
+                "Annual Training Report processing completed. " +
+                        "Processed feedbacks: {}, Skipped feedbacks: {}, " +
+                        "Report rows: {}",
+                processedFeedbacks,
+                skippedFeedbacks,
+                reportMap.size()
+        );
+
+        if (log.isDebugEnabled()) {
+            reportMap.values().forEach(dto ->
+                    log.debug(
+                            "Annual Training Report row: courseTypeId={}, course={}, " +
+                                    "subTotal={}, DRDS={}, DRTC={}, AdminAllied={}, Others={}",
+                            dto.getCourseTypeId(),
+                            dto.getCourse(),
+                            dto.getSubTotal(),
+                            dto.getDrdsTotal(),
+                            dto.getDrtcTotal(),
+                            dto.getAdminAlliedTotal(),
+                            dto.getOthersTotal()
+                    )
+            );
+        }
+
+        return new ArrayList<>(reportMap.values());
+    }
+
+    private void updateCourseLevelCount(AnnualTrainingReportDTO dto, String courseLevel) {
+        String level = normalize(courseLevel);
+        if ("NATIONAL".equalsIgnoreCase(level)) {
+            dto.setOutsideWithinIndia(increment(dto.getOutsideWithinIndia()));
+        } else if ("INTERNATIONAL".equalsIgnoreCase(level)) {
+            dto.setOutsideForeignAgency(increment(dto.getOutsideForeignAgency()));
+        } else {
+            log.debug("Course level '{}' is not mapped to National/International", courseLevel);
+        }
+        // These currently have no source field/data.
+        dto.setWithinLab(0L);
+        dto.setOtherLabs(0L);
+    }
+
+    private void updateCadreCounts(AnnualTrainingReportDTO dto, String cadre, String requestThrough, String gender) {
+
+        // DRDS
+        if ("DRDS".equalsIgnoreCase(cadre)) {
+            updateDrdsCounts(dto, requestThrough, gender);
+            return;
+        }
+
+        // DRTC
+        if ("DRTC".equalsIgnoreCase(cadre)) {
+            updateDrtcCounts(dto, requestThrough, gender);
+            return;
+        }
+
+        // ADMIN & ALLIED
+        if ("ADMIN & ALLIED".equalsIgnoreCase(cadre)) {
+            updateAdminAlliedCounts(dto, requestThrough, gender);
+            return;
+        }
+
+        // OTHERS
+        updateOthersCounts(dto, gender);
+    }
+
+    private void updateDrdsCounts(AnnualTrainingReportDTO dto, String requestThrough,
+                                  String gender) {
+        // Request Through
+        if ("TNI".equalsIgnoreCase(requestThrough)) {
+            dto.setDrdsTni(increment(dto.getDrdsTni()));
+        } else if ("RAC BOARD".equalsIgnoreCase(requestThrough)) {
+            dto.setDrdsRacBoard(increment(dto.getDrdsRacBoard()));
+        } else if ("OPEN".equalsIgnoreCase(requestThrough)) {
+            dto.setDrdsOpen(increment(dto.getDrdsOpen()));
+        } else {
+            log.debug("Unknown DRDS requestThrough: {}", requestThrough);
+        }
+
+        // Total
+        dto.setDrdsTotal(increment(dto.getDrdsTotal()));
+
+        // Gender
+        updateDrdsGender(dto, gender);
+    }
+
+    private void updateDrdsGender(AnnualTrainingReportDTO dto, String gender) {
+        if ("MALE".equalsIgnoreCase(gender)) {
+            dto.setDrdsMale(increment(dto.getDrdsMale()));
+        } else if ("FEMALE".equalsIgnoreCase(gender)) {
+            dto.setDrdsFemale(increment(dto.getDrdsFemale()));
+        } else {
+            log.debug("Unknown DRDS gender: {}", gender);
+        }
+    }
+
+    private void updateDrtcCounts(AnnualTrainingReportDTO dto, String requestThrough, String gender) {
+
+        // Request Through
+        if ("TNI".equalsIgnoreCase(requestThrough)) {
+            dto.setDrtcTni(increment(dto.getDrtcTni()));
+        } else if ("CEPTAM BOARD".equalsIgnoreCase(requestThrough)) {
+            dto.setDrtcCeptamBoard(increment(dto.getDrtcCeptamBoard()));
+        } else if ("OPEN".equalsIgnoreCase(requestThrough)) {
+            dto.setDrtcOpen(increment(dto.getDrtcOpen()));
+        } else {
+            log.debug("Unknown DRTC requestThrough: {}", requestThrough);
+        }
+
+        // Total
+        dto.setDrtcTotal(increment(dto.getDrtcTotal()));
+
+        // Gender
+        if ("MALE".equalsIgnoreCase(gender)) {
+            dto.setDrtcMale(increment(dto.getDrtcMale()));
+        } else if ("FEMALE".equalsIgnoreCase(gender)) {
+            dto.setDrtcFemale(increment(dto.getDrtcFemale()));
+        } else {
+            log.debug("Unknown DRTC gender: {}", gender);
+        }
+    }
+
+    private void updateAdminAlliedCounts(AnnualTrainingReportDTO dto, String requestThrough, String gender) {
+
+        // Request Through
+        if ("TNI".equalsIgnoreCase(requestThrough)) {
+            dto.setAdminAlliedTni(increment(dto.getAdminAlliedTni()));
+        } else if ("OPEN".equalsIgnoreCase(requestThrough)) {
+            dto.setAdminAlliedOpen(increment(dto.getAdminAlliedOpen()));
+        } else {
+            log.debug("Admin & Allied requestThrough '{}' has no dedicated column", requestThrough);
+        }
+
+        // Total
+        dto.setAdminAlliedTotal(increment(dto.getAdminAlliedTotal()));
+
+        // Gender
+        if ("MALE".equalsIgnoreCase(gender)) {
+            dto.setAdminAlliedMale(increment(dto.getAdminAlliedMale()));
+        } else if ("FEMALE".equalsIgnoreCase(gender)) {
+            dto.setAdminAlliedFemale(increment(dto.getAdminAlliedFemale()));
+        } else {
+            log.debug("Unknown Admin & Allied gender: {}", gender);
+        }
+    }
+
+    private void updateOthersCounts(AnnualTrainingReportDTO dto, String gender) {
+        // Total
+        dto.setOthersTotal(increment(dto.getOthersTotal()));
+
+        // Gender
+        if ("MALE".equalsIgnoreCase(gender)) {
+            dto.setOthersMale(increment(dto.getOthersMale()));
+        } else if ("FEMALE".equalsIgnoreCase(gender)) {
+            dto.setOthersFemale(increment(dto.getOthersFemale()));
+        } else {
+            log.debug("Unknown Others gender: {}", gender);
+        }
+    }
+
+    private Long increment(Long value) {
+        return value == null ? 1L : value + 1L;
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim();
     }
 
 
     public List<BudgetExpenditureDTO> getBudgetExpenditureReport(LocalDate fromDate, LocalDate toDate, String username) {
         log.info("Fetching budget expenditure report data");
 
-        List<Requisition> requisitions = requisitionRepository.getRequisitionDataByDateRange(fromDate,toDate);
+        List<Requisition> requisitions = requisitionRepository.getRequisitionDataByDateRange(fromDate, toDate);
         List<Course> courses = courseRepository.findAll();
         List<CourseType> courseTypes = courseTypeRepository.findAll();
-        List<Sponsorship> sponsorships = sponsorshipRepository.getSponsorshipDataByDateRange(fromDate,toDate);
+        List<Sponsorship> sponsorships = sponsorshipRepository.getSponsorshipDataByDateRange(fromDate, toDate);
 
         // Convert to Map for fast lookup
         Map<Long, Course> courseMap = courses.stream()
@@ -538,7 +839,9 @@ public class ReportService {
 
         // Group requisitions by empId
         Map<Long, List<Requisition>> requisitionByEmp =
-                requisitions.stream().collect(Collectors.groupingBy(Requisition::getInitiatingOfficer));
+                requisitions.stream()
+                        .filter(e->e.getIsAttend().equalsIgnoreCase("Y"))
+                        .collect(Collectors.groupingBy(Requisition::getInitiatingOfficer));
 
         List<BudgetExpenditureDTO> result = new ArrayList<>();
         Map<Long, EmployeeDTO> employeeMap = masterCacheService.getLongEmployeeDTOMap();
@@ -680,149 +983,266 @@ public class ReportService {
         return result;
     }
 
-    public List<GenderBudgetDTO> getGenderBudgetReport(String username) {
-
+    public List<GenderBudgetDTO> getGenderBudgetReport(String token) {
         log.info("Fetching gender budget report data");
-
         List<Requisition> requisitions = requisitionRepository.findAll();
         List<Course> courses = courseRepository.findAll();
         List<CourseType> courseTypes = courseTypeRepository.findAll();
         List<Sponsorship> sponsorships = sponsorshipRepository.findAll();
+        List<EmployeeDTO> employeeDTOList = getNominalRollList(token);
 
-        Map<Long, Course> courseMap = courses.stream()
-                .collect(Collectors.toMap(Course::getCourseId, Function.identity()));
-
-        Map<Long, CourseType> courseTypeMap = courseTypes.stream()
-                .collect(Collectors.toMap(CourseType::getCourseTypeId, Function.identity()));
-
-        long sponsorEmpCount = sponsorships.stream().mapToLong(Sponsorship::getEmpId).count();
+        Map<Long, EmployeeDTO> employeeMap = employeeDTOList.stream().filter(Objects::nonNull).filter(e -> e.getEmpId() != null).collect(Collectors.toMap(EmployeeDTO::getEmpId, Function.identity(), (existing, replacement) -> existing));
+        Map<Long, Course> courseMap = courses.stream().filter(Objects::nonNull).filter(c -> c.getCourseId() != null).collect(Collectors.toMap(Course::getCourseId, Function.identity(), (existing, replacement) -> existing));
+        Map<Long, CourseType> courseTypeMap = courseTypes.stream().filter(Objects::nonNull).filter(c -> c.getCourseTypeId() != null).collect(Collectors.toMap(CourseType::getCourseTypeId, Function.identity(), (existing, replacement) -> existing));
 
         GenderBudgetDTO dto = new GenderBudgetDTO();
         dto.setLabName(labCode);
 
         initializeZero(dto);
 
-        Set<Long> cepEmp = new HashSet<>();
-        Set<Long> specialEmp = new HashSet<>();
-        Set<Long> seminarEmp = new HashSet<>();
-        Set<Long> foreignEmp = new HashSet<>();
+        Set<Long> cepMaleEmp = new HashSet<>();
+        Set<Long> cepFemaleEmp = new HashSet<>();
+        Set<Long> specialMaleEmp = new HashSet<>();
+        Set<Long> specialFemaleEmp = new HashSet<>();
+        Set<Long> seminarMaleEmp = new HashSet<>();
+        Set<Long> seminarFemaleEmp = new HashSet<>();
+        Set<Long> foreignMaleEmp = new HashSet<>();
+        Set<Long> foreignFemaleEmp = new HashSet<>();
+        Set<Long> otherMaleEmp = new HashSet<>();
+        Set<Long> otherFemaleEmp = new HashSet<>();
 
         for (Requisition req : requisitions) {
-
+            if (req == null || req.getCourseId() == null) {
+                continue;
+            }
             Course course = courseMap.get(req.getCourseId());
-            if (course == null) continue;
-
+            if (course == null) {
+                log.debug("Course not found for requisition. CourseId={}", req.getCourseId());
+                continue;
+            }
             CourseType type = courseTypeMap.get(course.getCourseTypeId());
-            if (type == null) continue;
-
+            if (type == null) {
+                log.debug("Course type not found. CourseId={}, CourseTypeId={}", course.getCourseId(), course.getCourseTypeId());
+                addEmployeeToCategory(req.getInitiatingOfficer(), employeeMap, otherMaleEmp, otherFemaleEmp);
+                continue;
+            }
+            Long empId = req.getInitiatingOfficer();
+            if (empId == null) {
+                log.debug("Initiating employee is null. RequisitionId={}", req.getRequisitionId());
+                continue;
+            }
             String courseType = type.getCourseType();
             String level = course.getCourseLevel();
-            Long empId = req.getInitiatingOfficer();
-
             if ("CEP".equalsIgnoreCase(courseType)) {
-                cepEmp.add(empId);
+                addEmployeeToCategory(empId, employeeMap, cepMaleEmp, cepFemaleEmp);
             } else if ("Special".equalsIgnoreCase(courseType)) {
-                specialEmp.add(empId);
-            } else if (Stream.of("Seminar", "Symposium", "Conference", "Workshop")
-                    .anyMatch(courseType::equalsIgnoreCase)) {
-                seminarEmp.add(empId);
-            } else if ("Training".equalsIgnoreCase(courseType)
-                    && "International".equalsIgnoreCase(level)) {
-                foreignEmp.add(empId);
+                addEmployeeToCategory(empId, employeeMap, specialMaleEmp, specialFemaleEmp);
+            } else if (isSeminarType(courseType)) {
+                addEmployeeToCategory(empId, employeeMap, seminarMaleEmp, seminarFemaleEmp);
+            } else if ("Training".equalsIgnoreCase(courseType) && "International".equalsIgnoreCase(level)) {
+                addEmployeeToCategory(empId, employeeMap, foreignMaleEmp, foreignFemaleEmp);
+            } else {
+                addEmployeeToCategory(empId, employeeMap, otherMaleEmp, otherFemaleEmp);
             }
         }
+        setGenderValues(dto, cepMaleEmp.size(), cepFemaleEmp.size(), GenderCategory.CEP);
+        setGenderValues(dto, specialMaleEmp.size(), specialFemaleEmp.size(), GenderCategory.SPECIAL);
+        setGenderValues(dto, seminarMaleEmp.size(), seminarFemaleEmp.size(), GenderCategory.SEMINAR);
+        setGenderValues(dto, foreignMaleEmp.size(), foreignFemaleEmp.size(), GenderCategory.FOREIGN);
+        setGenderValues(dto, otherMaleEmp.size(), otherFemaleEmp.size(), GenderCategory.OTHERS);
 
-        dto.setHigherDegreeTotalNo(BigDecimal.valueOf(sponsorEmpCount));
-        dto.setCepTotalNo(BigDecimal.valueOf(cepEmp.size()));
-        dto.setSpecialTotalNo(BigDecimal.valueOf(specialEmp.size()));
-        dto.setSeminarTotalNo(BigDecimal.valueOf(seminarEmp.size()));
-        dto.setForeignTotalNo(BigDecimal.valueOf(foreignEmp.size()));
-
-        // Return as list
+        int higherDegreeTotal = sponsorships.size();
+        dto.setHigherDegreeTotalNo(BigDecimal.valueOf(higherDegreeTotal));
+        dto.setHigherDegreeMaleExp(BigDecimal.ZERO);
+        dto.setHigherDegreeFemaleExp(BigDecimal.ZERO);
+        dto.setHigherDegreeTotalExp(BigDecimal.ZERO);
+        log.info("Gender budget report generated. Lab={}, CEP={}, Special={}, " + "Seminar={}, Foreign={}, Others={}, HigherDegree={}", labCode, dto.getCepTotalNo(), dto.getSpecialTotalNo(), dto.getSeminarTotalNo(), dto.getForeignTotalNo(), dto.getOthersTotalNo(), dto.getHigherDegreeTotalNo());
         return Collections.singletonList(dto);
     }
 
-    public List<TrainingSCSTDTO> getTrainingSCSTReport(String token, String username) {
 
+    private void addEmployeeToCategory(Long empId, Map<Long, EmployeeDTO> employeeMap, Set<Long> maleEmployees, Set<Long> femaleEmployees) {
+        if (empId == null) {
+            return;
+        }
+
+        EmployeeDTO employee = employeeMap.get(empId);
+        if (employee == null) {
+            log.debug("Employee not found in nominal roll. EmpId={}", empId);
+            return;
+        }
+
+        if (employee.getEmployeeDetails() == null) {
+            log.debug("Employee details not available. EmpId={}", empId);
+            return;
+        }
+
+        String gender = employee.getEmployeeDetails().getGender();
+        if (gender == null || gender.trim().isEmpty()) {
+            log.debug("Gender not available for employee. EmpId={}", empId);
+            return;
+        }
+
+        gender = gender.trim();
+
+        if ("Male".equalsIgnoreCase(gender)) {
+            maleEmployees.add(empId);
+        } else if ("Female".equalsIgnoreCase(gender)) {
+            femaleEmployees.add(empId);
+        } else {
+            log.debug("Unsupported gender '{}' for employee. EmpId={}", gender, empId
+            );
+        }
+    }
+
+    private boolean isSeminarType(String courseType) {
+        if (courseType == null || courseType.trim().isEmpty()) {
+            return false;
+        }
+        return Stream.of("Seminar", "Symposium", "Conference", "Workshop").anyMatch(courseType::equalsIgnoreCase);
+    }
+
+    private void setGenderValues(GenderBudgetDTO dto, int maleCount, int femaleCount, GenderCategory category) {
+        BigDecimal male = BigDecimal.valueOf(maleCount);
+        BigDecimal female = BigDecimal.valueOf(femaleCount);
+        BigDecimal total = male.add(female);
+        switch (category) {
+            case CEP:
+                dto.setCepMaleNo(male);
+                dto.setCepFemaleNo(female);
+                dto.setCepTotalNo(total);
+                dto.setCepMaleExp(BigDecimal.ZERO);
+                dto.setCepFemaleExp(BigDecimal.ZERO);
+                dto.setCepTotalExp(BigDecimal.ZERO);
+                break;
+            case SPECIAL:
+                dto.setSpecialMaleNo(male);
+                dto.setSpecialFemaleNo(female);
+                dto.setSpecialTotalNo(total);
+                dto.setSpecialMaleExp(BigDecimal.ZERO);
+                dto.setSpecialFemaleExp(BigDecimal.ZERO);
+                dto.setSpecialTotalExp(BigDecimal.ZERO);
+                break;
+            case SEMINAR:
+                dto.setSeminarMaleNo(male);
+                dto.setSeminarFemaleNo(female);
+                dto.setSeminarTotalNo(total);
+                dto.setSeminarMaleExp(BigDecimal.ZERO);
+                dto.setSeminarFemaleExp(BigDecimal.ZERO);
+                dto.setSeminarTotalExp(BigDecimal.ZERO);
+                break;
+            case FOREIGN:
+                dto.setForeignMaleNo(male);
+                dto.setForeignFemaleNo(female);
+                dto.setForeignTotalNo(total);
+                dto.setForeignMaleExp(BigDecimal.ZERO);
+                dto.setForeignFemaleExp(BigDecimal.ZERO);
+                dto.setForeignTotalExp(BigDecimal.ZERO);
+                break;
+            case OTHERS:
+                dto.setOthersMaleNo(male);
+                dto.setOthersFemaleNo(female);
+                dto.setOthersTotalNo(total);
+                dto.setOthersMaleExp(BigDecimal.ZERO);
+                dto.setOthersFemaleExp(BigDecimal.ZERO);
+                dto.setOthersTotalExp(BigDecimal.ZERO);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private enum GenderCategory {CEP, SPECIAL, SEMINAR, FOREIGN, OTHERS}
+
+    public List<TrainingSCSTDTO> getTrainingSCSTReport(String token, String username) {
+        log.info("Fetching Training SC/ST report data");
         List<EmployeeDTO> employeeDTOList = getNominalRollList(token);
         List<Requisition> requisitions = requisitionRepository.findAll();
         List<Course> courses = courseRepository.findAll();
         List<CourseType> courseTypes = courseTypeRepository.findAll();
-
-        Map<Long, Course> courseMap = courses.stream()
-                .collect(Collectors.toMap(Course::getCourseId, Function.identity()));
-
-        Map<Long, CourseType> courseTypeMap = courseTypes.stream()
-                .collect(Collectors.toMap(CourseType::getCourseTypeId, Function.identity()));
-
-        // Convert employee list to map for fast lookup
-        Map<Long, EmployeeDTO> employeeMap = employeeDTOList.stream()
-                .collect(Collectors.toMap(EmployeeDTO::getEmpId, Function.identity()));
-
+        Map<Long, EmployeeDTO> employeeMap = employeeDTOList.stream().filter(Objects::nonNull).filter(e -> e.getEmpId() != null).collect(Collectors.toMap(EmployeeDTO::getEmpId, Function.identity(), (existing, replacement) -> existing)); /* * ------------------------------------------------------------ * Course Map * ------------------------------------------------------------ */
+        Map<Long, Course> courseMap = courses.stream().filter(Objects::nonNull).filter(c -> c.getCourseId() != null).collect(Collectors.toMap(Course::getCourseId, Function.identity(), (existing, replacement) -> existing)); /* * ------------------------------------------------------------ * Course Type Map * ------------------------------------------------------------ */
+        Map<Long, CourseType> courseTypeMap = courseTypes.stream().filter(Objects::nonNull).filter(c -> c.getCourseTypeId() != null).collect(Collectors.toMap(CourseType::getCourseTypeId, Function.identity(), (existing, replacement) -> existing)); /* * ------------------------------------------------------------ * DTO * ------------------------------------------------------------ */
         TrainingSCSTDTO dto = new TrainingSCSTDTO();
         dto.setLabName(labCode);
-
-        // Initialize all numeric fields to 0
         initializeTrainingDtoZero(dto);
 
-        // Use Set to avoid duplicate employee counting
         Set<Long> cepSet = new HashSet<>();
         Set<Long> specialSet = new HashSet<>();
         Set<Long> seminarSet = new HashSet<>();
         Set<Long> foreignSet = new HashSet<>();
+        Set<Long> othersSet = new HashSet<>();
 
         for (Requisition req : requisitions) {
-
-            EmployeeDTO emp = employeeMap.get(req.getInitiatingOfficer());
-            if (emp == null || emp.getEmployeeDetails() == null) continue;
-
-            String category = emp.getEmployeeDetails().getCategory();
-            if (category == null) continue;
-
-            // Only SC / ST
-            if (!("SC".equalsIgnoreCase(category) || "ST".equalsIgnoreCase(category)))
+            if (req == null || req.getInitiatingOfficer() == null) {
                 continue;
-
+            }
+            Long empId = req.getInitiatingOfficer();
+            EmployeeDTO employee = employeeMap.get(empId);
+            if (employee == null) {
+                log.debug("Employee not found in nominal roll. EmpId={}", empId);
+                continue;
+            } /* * EmployeeDetails can be null. */
+            if (employee.getEmployeeDetails() == null) {
+                log.debug("Employee details not available. EmpId={}", empId);
+                continue;
+            }
+            String category = employee.getEmployeeDetails().getCategory();
+            if (category == null || category.trim().isEmpty()) {
+                log.debug("Employee category not available. EmpId={}", empId);
+                continue;
+            }
+            category = category.trim(); /* * Only SC and ST employees are considered. */
+            if (!"SC".equalsIgnoreCase(category) && !"ST".equalsIgnoreCase(category)) {
+                continue;
+            }
+            if (req.getCourseId() == null) {
+                log.debug("CourseId not available for requisition. EmpId={}", empId);
+                continue;
+            }
             Course course = courseMap.get(req.getCourseId());
-            if (course == null) continue;
-
+            if (course == null) {
+                log.debug("Course not found. CourseId={}, EmpId={}", req.getCourseId(), empId);
+                continue;
+            }
             CourseType type = courseTypeMap.get(course.getCourseTypeId());
-            if (type == null) continue;
-
+            if (type == null) {
+                othersSet.add(empId);
+                continue;
+            }
             String courseType = type.getCourseType();
             String level = course.getCourseLevel();
-            Long empId = req.getInitiatingOfficer();
-
-            // 1. CEP
             if ("CEP".equalsIgnoreCase(courseType)) {
                 cepSet.add(empId);
-            }
-
-            // 1. Special
-            else if ("Special".equalsIgnoreCase(courseType)) {
+            } else if ("Special".equalsIgnoreCase(courseType)) {
                 specialSet.add(empId);
-            }
-
-            // 2. Seminar/Symposium/Conference/Workshop
-            else if (Stream.of("Seminar", "Symposium", "Conference", "Workshop").anyMatch(courseType::equalsIgnoreCase)) {
-
+            } else if (isSeminarType(courseType)) {
                 seminarSet.add(empId);
-            }
-
-            // 3. Training + International
-            else if ("Training".equalsIgnoreCase(courseType)
-                    && "International".equalsIgnoreCase(level)) {
-
+            } else if ("Training".equalsIgnoreCase(courseType) && "International".equalsIgnoreCase(level)) {
                 foreignSet.add(empId);
+            } else {
+                othersSet.add(empId);
             }
         }
-
-        // Set counts
         dto.setCepScstTrained((long) cepSet.size());
         dto.setSpecialTargetedScstTrained((long) specialSet.size());
         dto.setSponsoredSeminarScstTrained((long) seminarSet.size());
         dto.setForeignTrainingScstTrained((long) foreignSet.size());
+        dto.setOthersScstTrained((long) othersSet.size());
+        dto.setCepExpenditure(BigDecimal.ZERO);
+        dto.setSpecialTargetedExpenditure(BigDecimal.ZERO);
+        dto.setHigherDegreeExpenditure(BigDecimal.ZERO);
+        dto.setSponsoredSeminarExpenditure(BigDecimal.ZERO);
+        dto.setForeignTrainingExpenditure(0L);
+        dto.setOthersExpenditure(0L);
+        dto.setCepPercentage(0L);
+        dto.setSpecialTargetedPercentage(0L);
+        dto.setHigherDegreePercentage(0L);
+        dto.setSponsoredSeminarPercentage(0L);
+        dto.setForeignTrainingPercentage(0L);
+        dto.setOthersPercentage(0L);
 
+        log.info("Training SC/ST report generated. Lab={}, " + "CEP={}, Special={}, Seminar={}, Foreign={}, Others={}", labCode, dto.getCepScstTrained(), dto.getSpecialTargetedScstTrained(), dto.getSponsoredSeminarScstTrained(), dto.getForeignTrainingScstTrained(), dto.getOthersScstTrained());
         return Collections.singletonList(dto);
     }
 
@@ -905,12 +1325,13 @@ public class ReportService {
         return trainingService.getJournalList(0L, "ROLE_ADMIN", username);
     }
 
-    public List<RequisitionDTO> getResearchPaperDetailReport(LocalDate fromDate, LocalDate toDate, String username) {
+    public List<RequisitionDTO> getResearchPaperDetailReport(LocalDate fromDate, LocalDate toDate, String
+            username) {
         log.info("Fetching research paper detail report data");
 
-        List<Requisition> requisitions = requisitionRepository.findActiveRequisitionsWithJournalId(fromDate,toDate);
+        List<Requisition> requisitions = requisitionRepository.findActiveRequisitionsWithJournalId(fromDate, toDate);
 
-        List<JournalDTO> journalDTOList = trainingService.getJournalList(0L,"ROLE_ADMIN", username);
+        List<JournalDTO> journalDTOList = trainingService.getJournalList(0L, "ROLE_ADMIN", username);
         Map<Long, JournalDTO> journalMap = journalDTOList.stream()
                 .collect(Collectors.toMap(JournalDTO::getJournalId, Function.identity()));
 
@@ -937,7 +1358,7 @@ public class ReportService {
                     dto.setCourseType(typeDTO.getCourseType());
                     dto.setVenue(course.getVenue());
 
-                    dto.setTitleOfPaper(journalDTO!=null ? journalDTO.getTitleOfPaper() : "");
+                    dto.setTitleOfPaper(journalDTO != null ? journalDTO.getTitleOfPaper() : "");
 
                     if (organizer != null) {
                         dto.setOrganizer(organizer.getOrganizer());

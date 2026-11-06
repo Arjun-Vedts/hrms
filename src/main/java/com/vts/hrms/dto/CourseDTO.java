@@ -3,6 +3,7 @@ package com.vts.hrms.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -46,5 +47,9 @@ public class CourseDTO implements Serializable {
 
     @NotNull(message = "To date is required")
     private LocalDate toDate;
+
+    private String brochureName;
+
+    private MultipartFile multipartFileBrochure;
 
 }

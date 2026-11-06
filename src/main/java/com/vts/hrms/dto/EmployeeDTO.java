@@ -35,7 +35,6 @@ public class EmployeeDTO implements Serializable {
     private String roleName;
     private String hindiRoleName;
     private String maritalStatus;
-    private String gender;
     private String email;
     private String mobileNo;
     private String username;
